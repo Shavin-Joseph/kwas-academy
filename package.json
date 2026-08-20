@@ -1,0 +1,28 @@
+{
+  "name": "kwas-academy",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3001",
+    "build": "next build && node -e \"const fs=require('fs');const p='.next/cache';if(fs.existsSync(p))fs.rmSync(p,{recursive:true,force:true});console.log('Removed .next/cache for Cloudflare deployment');\"",
+    "start": "next start -p 3001",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "framer-motion": "^11.18.2",
+    "lucide-react": "^0.473.0",
+    "next": "14.2.35",
+    "next-themes": "^0.4.4",
+    "react": "^18",
+    "react-dom": "^18"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "autoprefixer": "^10.0.1",
+    "postcss": "^8",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5"
+  }
+}
