@@ -1,0 +1,95 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  role      String   @default("student")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  progress  LessonProgress[]
+  quizzes   QuizSubmission[]
+  bookmarks Bookmark[]
+}
+
+model Course {
+  id          String   @id
+  slug        String   @unique
+  title       String
+  tagline     String
+  description String
+  category    String
+  level       String
+  estimatedHours Int
+  createdAt   DateTime @default(now())
+
+  modules     Module[]
+}
+
+model Module {
+  id          String   @id
+  slug        String
+  title       String
+  description String
+  courseId    String
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons     Lesson[]
+}
+
+model Lesson {
+  id          String   @id
+  slug        String
+  title       String
+  description String
+  durationMinutes Int
+  difficulty  String
+  moduleId    String
+  module      Module   @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  progress    LessonProgress[]
+  bookmarks   Bookmark[]
+}
+
+model LessonProgress {
+  id          String   @id @default(uuid())
+  userId      String
+  lessonId    String
+  completed   Boolean  @default(false)
+  completedAt DateTime?
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson      Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+}
+
+model QuizSubmission {
+  id          String   @id @default(uuid())
+  userId      String
+  quizId      String
+  score       Int
+  total       Int
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Bookmark {
+  id          String   @id @default(uuid())
+  userId      String
+  lessonId    String
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson      Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+}

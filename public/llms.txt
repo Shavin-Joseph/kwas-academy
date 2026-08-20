@@ -1,0 +1,46 @@
+# KWAS Academy (academy.kwas.tech)
+> Learn. Build. Master. An advanced, documentation-first technology and software engineering learning platform by KWAS Technologies (https://kwas.tech).
+
+## Overview
+KWAS Academy provides 100% free, paywall-free educational documentation, comprehensive roadmaps, interactive code sandboxes, and production project blueprints across 20+ software engineering disciplines.
+
+## Official Curriculum Tracks
+- HTML5 Documentation: https://academy.kwas.tech/learn/html
+- CSS3 & Modern Styling: https://academy.kwas.tech/learn/css
+- JavaScript (ES6+ & Async): https://academy.kwas.tech/learn/javascript
+- TypeScript Strict Architecture: https://academy.kwas.tech/learn/typescript
+- React 19 Component Engineering: https://academy.kwas.tech/learn/react
+- Next.js 16 Full-Stack App Router: https://academy.kwas.tech/learn/nextjs
+- Node.js & REST API Architecture: https://academy.kwas.tech/learn/nodejs
+- Python 3 Core & Algorithms: https://academy.kwas.tech/learn/python
+- SQL & PostgreSQL Relational Databases: https://academy.kwas.tech/learn/sql
+- Java 21 Enterprise Development: https://academy.kwas.tech/learn/java
+- C++20 Systems Programming: https://academy.kwas.tech/learn/cpp
+- Go (Golang) Microservices: https://academy.kwas.tech/learn/go
+- Rust Systems & Memory Safety: https://academy.kwas.tech/learn/rust
+- Data Structures & Algorithms (DSA): https://academy.kwas.tech/learn/dsa
+- Distributed System Design: https://academy.kwas.tech/learn/system-design
+- DevOps, Docker & Kubernetes: https://academy.kwas.tech/learn/devops
+- Cybersecurity & OWASP Defense: https://academy.kwas.tech/learn/cybersecurity
+- AI, Machine Learning & RAG: https://academy.kwas.tech/learn/ai-ml
+
+## Developer Career Roadmaps
+- Frontend Engineer: https://academy.kwas.tech/roadmaps/frontend
+- Backend Engineer: https://academy.kwas.tech/roadmaps/backend
+- Full-Stack Architect: https://academy.kwas.tech/roadmaps/full-stack
+- DevOps & Cloud Platform Engineer: https://academy.kwas.tech/roadmaps/devops
+- AI & Machine Learning Engineer: https://academy.kwas.tech/roadmaps/ai-engineer
+- Cybersecurity Specialist: https://academy.kwas.tech/roadmaps/cybersecurity
+
+## Platform Tools & Blueprints
+- Cloud Studio Playground: https://academy.kwas.tech/playground
+- Interactive Practice Arena: https://academy.kwas.tech/practice
+- Production Project Blueprints: https://academy.kwas.tech/projects
+- Computer Science Glossary: https://academy.kwas.tech/glossary
+
+## Organization & Legal
+- Parent Brand: KWAS Technologies (https://kwas.tech)
+- Official Support: support@kwas.tech
+- About Us: https://academy.kwas.tech/about
+- Privacy Policy: https://academy.kwas.tech/privacy
+- Terms of Service: https://academy.kwas.tech/terms

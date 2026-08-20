@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">
+  <ShortName>KWAS Academy</ShortName>
+  <Description>Search 20+ complete programming courses, interactive tutorials, and technical documentation.</Description>
+  <InputEncoding>UTF-8</InputEncoding>
+  <Image width="16" height="16" type="image/svg+xml">https://academy.kwas.tech/favicon.svg</Image>
+  <Url type="text/html" template="https://academy.kwas.tech/courses?search={searchTerms}"/>
+  <Developer>KWAS Technologies (support@kwas.tech)</Developer>
+  <Contact>support@kwas.tech</Contact>
+  <Attribution>© 2026 KWAS Technologies (Key Web App Solutions Technologies). All rights reserved.</Attribution>
+  <Language>en-us</Language>
+</OpenSearchDescription>
