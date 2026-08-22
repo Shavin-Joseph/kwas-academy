@@ -444,5 +444,523 @@ export const htmlCourse: Course = {
         },
       ],
     },
+    {
+      id: "mod-html-12",
+      slug: "webassembly-shared-array-buffer",
+      title: "Module 12: WebAssembly Integration, SharedArrayBuffer & Atomics",
+      description: "Embed high-performance C++/Rust binaries in HTML using WebAssembly, SharedArrayBuffer memory, and multithreaded Atomics.",
+      lessons: [
+        {
+          id: "html-wasm-sab",
+          slug: "webassembly-sharedarraybuffer-atomics-html",
+          courseSlug: "html",
+          moduleSlug: "webassembly-shared-array-buffer",
+          title: "WebAssembly Integration, SharedArrayBuffer & Browser Atomics",
+          description: "Execute compiled near-native bytecode in the browser via HTML WebAssembly APIs, cross-origin isolation headers (COOP/COEP), and low-level memory synchronization with Atomics.",
+          durationMinutes: 24,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "How HTML loads and instantiates WebAssembly binary modules (`.wasm`) via streaming compilation",
+            "Configuring Cross-Origin Isolation headers (COOP & COEP) required for SharedArrayBuffer",
+            "Low-level memory synchronization across Web Workers using `Atomics.wait()` and `Atomics.notify()`",
+            "Zero-copy linear memory management between JavaScript and compiled WebAssembly code",
+          ],
+          introduction: `WebAssembly (Wasm) is a low-level binary format designed to execute high-performance code in modern web browsers at near-native speed. By coupling WebAssembly with HTML and Web Workers through SharedArrayBuffer, web applications can achieve multithreaded parallel computing for video encoding, 3D physics engines, and machine learning models directly in the browser tab.`,
+          whyItMatters: `Standard JavaScript execution runs on a single main UI thread. For computationally intensive tasks (like audio DSP or image processing in Figma/Canva), WebAssembly and SharedArrayBuffer prevent frame drops and keep the HTML interface at 120 FPS.`,
+          syntax: `WebAssembly.instantiateStreaming(fetch('module.wasm'), importObject)\nconst sharedMem = new SharedArrayBuffer(1024);\nAtomics.store(new Int32Array(sharedMem), 0, 42);`,
+          mainExample: {
+            title: "Streaming WebAssembly Compilation and Shared Memory Allocation",
+            language: "html",
+            code: `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebAssembly & SharedArrayBuffer Architecture</title>
+</head>
+<body>
+  <h1>KWAS Academy WebAssembly Runtime</h1>
+  <button id="computeBtn">Execute Parallel Computation</button>
+  <div id="output">Status: Idle</div>
+
+  <script>
+    // 1. Allocate a 1MB SharedArrayBuffer accessible by Main Thread and Web Workers
+    const sharedBuffer = new SharedArrayBuffer(1024 * 1024);
+    const int32View = new Int32Array(sharedBuffer);
+
+    // 2. Stream and instantiate WebAssembly module
+    async function initWasmEngine() {
+      try {
+        const importObject = {
+          env: {
+            memory: new WebAssembly.Memory({ initial: 256, maximum: 512, shared: true }),
+            logProgress: (val) => console.log("Wasm Computation Progress:", val)
+          }
+        };
+
+        const wasmModule = await WebAssembly.instantiateStreaming(
+          fetch('/engine.wasm'),
+          importObject
+        );
+
+        document.getElementById('output').textContent = "WebAssembly Engine Initialized Successfully!";
+      } catch (err) {
+        console.warn("Wasm Streaming Fallback (Local Simulation):", err.message);
+        document.getElementById('output').textContent = "Wasm Ready (Simulation Mode Active)";
+      }
+    }
+
+    document.getElementById('computeBtn').addEventListener('click', initWasmEngine);
+  </script>
+</body>
+</html>`,
+            executable: true,
+            explanation: [
+              "WebAssembly.instantiateStreaming compiles and instantiates bytecode simultaneously while the network stream downloads.",
+              "SharedArrayBuffer allows multiple Web Workers and Wasm instances to read and write to the exact same physical memory block.",
+              "Cross-Origin Isolation headers (Cross-Origin-Opener-Policy: same-origin) are mandatory security prerequisites for SharedArrayBuffer.",
+            ],
+          },
+          detailedExplanation: [
+            "Spectre Mitigation & Cross-Origin Isolation: Following the Spectre hardware CPU vulnerability, browsers restricted SharedArrayBuffer. To enable it, servers must send `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp` HTTP headers.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Attempting to use SharedArrayBuffer on servers without COOP/COEP security headers.",
+              badCode: "const mem = new SharedArrayBuffer(1024); // Throws ReferenceError: SharedArrayBuffer is not defined",
+              goodCode: "// Send headers in server response:\n// Cross-Origin-Opener-Policy: same-origin\n// Cross-Origin-Embedder-Policy: require-corp",
+              explanation: "Browsers completely disable SharedArrayBuffer in unisolated execution contexts to prevent side-channel timing attacks.",
+            },
+          ],
+          bestPractices: [
+            "Always prefer `WebAssembly.instantiateStreaming` over manual arrayBuffer parsing for faster startup.",
+            "Use `Atomics` operations when reading or writing shared memory across workers to prevent race conditions.",
+            "Export memory allocations cleanly from Wasm modules using standard linear memory buffers.",
+          ],
+          summary: [
+            "WebAssembly executes compiled C++/Rust/Go bytecode in browsers with near-native efficiency.",
+            "SharedArrayBuffer enables shared-memory multithreading between the main thread and background workers.",
+            "Cross-Origin Isolation headers are required to activate high-resolution timers and shared buffers.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-html-13",
+      slug: "web-components-internals",
+      title: "Module 13: Web Components: Custom Elements, Shadow DOM & Templates",
+      description: "Build framework-agnostic UI component libraries using Custom Elements v1, Shadow DOM encapsulation, and <template> tags.",
+      lessons: [
+        {
+          id: "html-web-components",
+          slug: "web-components-custom-elements-shadow-dom",
+          courseSlug: "html",
+          moduleSlug: "web-components-internals",
+          title: "Custom Elements v1, Shadow DOM & Template Cloning",
+          description: "Create native, reusable, and framework-independent UI widgets using HTML5 Custom Elements, encapsulated Shadow DOM styles, and declarative templates.",
+          durationMinutes: 22,
+          difficulty: "Intermediate",
+          whatYouWillLearn: [
+            "The 3 pillars of Web Components: Custom Elements, Shadow DOM, and HTML Templates",
+            "Encapsulating CSS styles to prevent global stylesheet leakage using `attachShadow({ mode: 'open' })`",
+            "Managing custom element lifecycle callbacks: `connectedCallback`, `disconnectedCallback`, and `attributeChangedCallback`",
+            "Declarative Shadow DOM (`<template shadowrootmode='open'>`) for Server-Side Rendering (SSR)",
+          ],
+          introduction: `Web Components are a suite of browser-native technologies that allow developers to create custom, reusable, and encapsulated HTML tags (like <kwas-video-player>) that work natively across React, Angular, Vue, or vanilla HTML without framework dependencies.`,
+          whyItMatters: `Enterprise design systems built on Web Components survive framework obsolescence. Components written today will continue to work unchanged for decades across all web browsers.`,
+          syntax: `class CustomCard extends HTMLElement {\n  constructor() {\n    super();\n    this.attachShadow({ mode: 'open' });\n  }\n}\ncustomElements.define('kwas-card', CustomCard);`,
+          mainExample: {
+            title: "A Complete Encapsulated Web Component with Shadow DOM",
+            language: "html",
+            code: `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Custom Elements & Shadow DOM Architecture</title>
+</head>
+<body>
+  <!-- Declarative Custom Element Instance -->
+  <kwas-badge variant="pro" label="Enterprise Architecture"></kwas-badge>
+
+  <!-- Component Template -->
+  <template id="kwas-badge-template">
+    <style>
+      :host {
+        display: inline-block;
+        font-family: system-ui, sans-serif;
+      }
+      .badge-container {
+        padding: 4px 12px;
+        border-radius: 9999px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+        color: #ffffff;
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+      }
+    </style>
+    <span class="badge-container" part="badge">
+      <slot name="prefix"></slot>
+      <span class="badge-text"></span>
+    </span>
+  </template>
+
+  <script>
+    class KwasBadge extends HTMLElement {
+      static get observedAttributes() { return ['label']; }
+
+      constructor() {
+        super();
+        const shadow = this.attachShadow({ mode: 'open' });
+        const template = document.getElementById('kwas-badge-template');
+        shadow.appendChild(template.content.cloneNode(true));
+      }
+
+      connectedCallback() {
+        this.updateLabel();
+      }
+
+      attributeChangedCallback(name, oldVal, newVal) {
+        if (name === 'label' && oldVal !== newVal) {
+          this.updateLabel();
+        }
+      }
+
+      updateLabel() {
+        const textElem = this.shadowRoot.querySelector('.badge-text');
+        if (textElem) {
+          textElem.textContent = this.getAttribute('label') || 'Default Badge';
+        }
+      }
+    }
+
+    customElements.define('kwas-badge', KwasBadge);
+  </script>
+</body>
+</html>`,
+            executable: true,
+            explanation: [
+              "customElements.define registers the custom HTML tag name (which must contain a hyphen).",
+              "this.attachShadow({ mode: 'open' }) creates an isolated DOM subtree where internal styles cannot leak out and external styles cannot leak in.",
+              "template.content.cloneNode(true) provides high-speed DOM instantiation without re-parsing HTML strings.",
+            ],
+          },
+          detailedExplanation: [
+            "Declarative Shadow DOM: Modern browsers support `<template shadowrootmode='open'>`. This allows server-side rendered HTML (from Next.js or Astro) to stream pre-rendered Shadow DOM trees to the client before JavaScript hydrates.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Naming a custom element without a hyphen (e.g., customElements.define('badge', Badge)).",
+              badCode: "customElements.define('mybadge', MyBadge);",
+              goodCode: "customElements.define('my-badge', MyBadge);",
+              explanation: "The W3C specification strictly requires custom elements to include at least one hyphen to avoid collisions with future native HTML elements.",
+            },
+          ],
+          bestPractices: [
+            "Always include a hyphen in custom element names (e.g. `app-card`, `kwas-player`).",
+            "Use `<slot>` elements to provide flexible content projection points.",
+            "Use the `::part()` pseudo-element to expose styled micro-components safely to parent stylesheets.",
+          ],
+          summary: [
+            "Web Components deliver framework-independent, reusable native HTML widgets.",
+            "Shadow DOM guarantees 100% style and DOM encapsulation.",
+            "Lifecycle callbacks manage component mounting, unmounting, and attribute changes cleanly.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-html-14",
+      slug: "browser-streams-webcodecs",
+      title: "Module 14: Browser Streams API & WebCodecs Processing",
+      description: "Process real-time streaming data, chunked network payloads, and low-latency audio/video with WebCodecs.",
+      lessons: [
+        {
+          id: "html-streams-codecs",
+          slug: "browser-streams-api-webcodecs-processing",
+          courseSlug: "html",
+          moduleSlug: "browser-streams-webcodecs",
+          title: "ReadableStreams, TransformStreams & WebCodecs API",
+          description: "Master chunked data processing directly in HTML using ReadableStream, TransformStream pipelines, and frame-by-frame hardware video decoding with WebCodecs.",
+          durationMinutes: 24,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "Consuming chunked HTTP responses in real time with `ReadableStream` and `getReader()`",
+            "Transforming data on the fly with `TransformStream` (e.g. TextDecoderStream, CompressionStream)",
+            "Hardware-accelerated video decoding with the `VideoDecoder` API in WebCodecs",
+            "Applying backpressure to prevent buffer overflows during high-throughput network streaming",
+          ],
+          introduction: `Historically, web applications had to download entire files into RAM before parsing their contents. The modern HTML5 Streams API allows browsers to read, transform, and write data chunk-by-chunk in real time as packets arrive over the network, drastically reducing peak memory consumption.`,
+          whyItMatters: `For AI chatbots streaming tokenized text (like ChatGPT), live video analytics, and multi-gigabyte file downloads, the Streams API enables instant visual feedback without freezing the user's browser.`,
+          syntax: `const response = await fetch('/api/stream');\nconst reader = response.body.getReader();\nconst { value, done } = await reader.read();`,
+          mainExample: {
+            title: "Streaming AI Token Generator with Streams API",
+            language: "html",
+            code: `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Browser Streams API Architecture</title>
+</head>
+<body>
+  <h1>AI Token Streaming Pipeline</h1>
+  <button id="startStream">Start Token Stream</button>
+  <div id="terminal" style="font-family: monospace; white-space: pre-wrap; background: #0f172a; color: #38bdf8; padding: 16px; border-radius: 8px;"></div>
+
+  <script>
+    // Simulated chunked stream generator
+    function createTokenStream() {
+      const tokens = ["KWAS ", "Academy ", "delivers ", "deep ", "architectural ", "knowledge ", "for ", "software ", "engineers."];
+      return new ReadableStream({
+        async start(controller) {
+          for (const token of tokens) {
+            await new Promise(r => setTimeout(r, 120)); // Simulates packet latency
+            controller.enqueue(new TextEncoder().encode(token));
+          }
+          controller.close();
+        }
+      });
+    }
+
+    document.getElementById('startStream').addEventListener('click', async () => {
+      const output = document.getElementById('terminal');
+      output.textContent = "";
+
+      const stream = createTokenStream();
+      // Pipe through native TextDecoderStream
+      const decodedStream = stream.pipeThrough(new TextDecoderStream());
+      const reader = decodedStream.getReader();
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        output.textContent += value;
+      }
+    });
+  </script>
+</body>
+</html>`,
+            executable: true,
+            explanation: [
+              "ReadableStream encapsulates an asynchronous source of data chunks.",
+              "pipeThrough(new TextDecoderStream()) chains an intermediate transform stream that decodes binary bytes into UTF-8 text.",
+              "reader.read() processes each incoming chunk with zero buffering delays.",
+            ],
+          },
+          detailedExplanation: [
+            "WebCodecs Architecture: The WebCodecs API provides low-level access to the browser's native hardware video and audio encoders and decoders (`VideoEncoder`, `VideoDecoder`, `AudioDecoder`), allowing developers to manipulate individual video frames (`VideoFrame`) on HTML Canvas elements with sub-millisecond latency.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Calling reader.read() without checking the 'done' boolean property, causing infinite loops.",
+              badCode: "while(true) { const { value } = await reader.read(); process(value); }",
+              goodCode: "while(true) { const { value, done } = await reader.read(); if (done) break; process(value); }",
+              explanation: "When a stream terminates, reader.read() returns { value: undefined, done: true }. Always break immediately when done is true.",
+            },
+          ],
+          bestPractices: [
+            "Use `pipeThrough` to compose modular transformation chains cleanly.",
+            "Always release stream locks with `reader.releaseLock()` if abandoning a stream early.",
+            "Leverage `CompressionStream('gzip')` to compress uploaded payloads on the fly.",
+          ],
+          summary: [
+            "Streams API processes data chunk-by-chunk in real time without storing entire files in memory.",
+            "TransformStreams cleanly pipeline data conversions like decompression and decoding.",
+            "WebCodecs provides hardware-accelerated access to video and audio frame buffers.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-html-15",
+      slug: "pwa-service-workers",
+      title: "Module 15: Progressive Web Apps (PWA) & Service Worker Cache",
+      description: "Build offline-capable web applications using Web App Manifests, Service Worker cache strategies, and Background Sync.",
+      lessons: [
+        {
+          id: "html-pwa-sw",
+          slug: "progressive-web-apps-service-workers-offline-cache",
+          courseSlug: "html",
+          moduleSlug: "pwa-service-workers",
+          title: "Progressive Web Apps, Service Workers & Offline Caching",
+          description: "Transform HTML websites into installable offline-capable Progressive Web Apps using manifest.json, Service Worker lifecycle events, and CacheStorage caching patterns.",
+          durationMinutes: 24,
+          difficulty: "Intermediate",
+          whatYouWillLearn: [
+            "The anatomy of a Progressive Web App (PWA): manifest.json, HTTPS, and Service Workers",
+            "Service Worker lifecycles: `install`, `activate`, and `fetch` event interception",
+            "Caching strategies: Cache-First (Static Assets), Network-First (API Data), and Stale-While-Revalidate",
+            "Registering background sync with `SyncManager` for guaranteed offline form submission",
+          ],
+          introduction: `Progressive Web Apps (PWAs) leverage modern browser APIs to deliver native app-like experiences directly through HTML. A Service Worker acts as a client-side programmable proxy server sitting between your web application and the network, enabling instant offline loading, background sync, and push notifications.`,
+          whyItMatters: `Users on flaky mobile connections frequently experience offline disconnections. PWAs with robust Service Worker caching load instantly from cache, providing a seamless offline experience and boosting user retention.`,
+          syntax: `navigator.serviceWorker.register('/sw.js');\nself.addEventListener('fetch', (event) => {\n  event.respondWith(caches.match(event.request));\n});`,
+          mainExample: {
+            title: "Registering a Service Worker and Stale-While-Revalidate Caching",
+            language: "html",
+            code: `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#3b82f6">
+  <title>KWAS Academy PWA</title>
+</head>
+<body>
+  <h1>KWAS Academy Offline-First Platform</h1>
+  <p id="network-status">Network Status: Online</p>
+
+  <script>
+    // 1. Register Service Worker on window load
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', async () => {
+        try {
+          const registration = await navigator.serviceWorker.register('/sw.js');
+          console.log("Service Worker registered with scope:", registration.scope);
+        } catch (err) {
+          console.error("Service Worker registration failed:", err);
+        }
+      });
+    }
+
+    // 2. Monitor network connection state
+    window.addEventListener('online', () => {
+      document.getElementById('network-status').textContent = "Network Status: Online (Connected)";
+    });
+    window.addEventListener('offline', () => {
+      document.getElementById('network-status').textContent = "Network Status: Offline (Serving cached docs)";
+    });
+  </script>
+</body>
+</html>`,
+            executable: true,
+            explanation: [
+              "link rel='manifest' registers metadata (app name, icons, display mode) required for native device installation.",
+              "navigator.serviceWorker.register installs the background proxy worker script.",
+              "The Service Worker intercepts fetch requests to serve cached responses when the device is disconnected from the internet.",
+            ],
+          },
+          detailedExplanation: [
+            "Cache Strategies: Cache-First serves immediately from CacheStorage and falls back to network (best for fonts, icons, images). Network-First queries network first and falls back to cache (best for live market data). Stale-While-Revalidate serves cached content immediately while silently updating the cache in the background.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Caching API mutation requests (POST/PUT/DELETE) inside CacheStorage.",
+              badCode: "if (event.request.method === 'POST') { caches.put(event.request, response); }",
+              goodCode: "if (event.request.method === 'GET') { event.respondWith(caches.match(event.request)); }",
+              explanation: "CacheStorage only supports caching idempotent GET requests. POST requests should be queued in IndexedDB via Background Sync.",
+            },
+          ],
+          bestPractices: [
+            "Version cache names (`kwas-cache-v1`) to automatically delete obsolete assets during the `activate` event.",
+            "Use Stale-While-Revalidate for documentation content to ensure instant rendering and fresh background updates.",
+            "Always serve PWAs exclusively over secure HTTPS connections.",
+          ],
+          summary: [
+            "PWAs make web applications installable and operable offline.",
+            "Service Workers intercept network traffic and manage CacheStorage.",
+            "Stale-While-Revalidate balances zero-latency rendering with background data freshness.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-html-16",
+      slug: "content-security-policy-trusted-types",
+      title: "Module 16: Content Security Policy (CSP3), Trusted Types & SRI",
+      description: "Hardening HTML applications against Cross-Site Scripting (XSS) using CSP Level 3, Trusted Types, and Subresource Integrity.",
+      lessons: [
+        {
+          id: "html-csp-trusted-types",
+          slug: "content-security-policy-trusted-types-sri-hardening",
+          courseSlug: "html",
+          moduleSlug: "content-security-policy-trusted-types",
+          title: "Content Security Policy Level 3 & Trusted Types Hardening",
+          description: "Defend HTML applications against DOM-based Cross-Site Scripting (XSS) and code injection using CSP3 nonces, Trusted Types policies, and Subresource Integrity (SRI) hashes.",
+          durationMinutes: 26,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "Writing strict Content Security Policy Level 3 headers with cryptographic nonces",
+            "Eliminating DOM XSS vulnerabilities by enforcing the Trusted Types API (`require-trusted-types-for 'script'`)",
+            "Verifying CDN asset integrity with Subresource Integrity (SRI) SHA-384 hashes",
+            "Restricting framing and clickjacking attacks using `frame-ancestors 'none'`",
+          ],
+          introduction: `HTML applications are subject to injection vulnerabilities when untrusted user input is parsed as code. Content Security Policy (CSP Level 3) and the W3C Trusted Types API represent the highest standard of client-side web security, forcing the browser to reject untrusted scripts, inline styles, and unverified DOM string injections at the parser level.`,
+          whyItMatters: `Cross-Site Scripting (XSS) is historically among the most exploited web vulnerabilities. Enforcing strict CSP nonces and Trusted Types guarantees that even if an attacker injects a malicious <script> tag into your HTML, the browser will refuse to execute it.`,
+          syntax: `<meta http-equiv="Content-Security-Policy" content="script-src 'nonce-rAnd0m' 'strict-dynamic';">\n<script src="https://cdn.example.com/lib.js" integrity="sha384-..." crossorigin="anonymous"></script>`,
+          mainExample: {
+            title: "Securing HTML with Cryptographic Nonce CSP and SRI Hashes",
+            language: "html",
+            code: `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <!-- Content Security Policy Level 3 Meta Definition -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'self' 'nonce-kwasSecureRandom2026' https://cdn.jsdelivr.net;
+    style-src 'self' 'unsafe-inline';
+    object-src 'none';
+    base-uri 'self';
+    frame-ancestors 'none';
+    require-trusted-types-for 'script';
+  ">
+  <title>KWAS Academy Security Baseline</title>
+
+  <!-- External Library with Subresource Integrity (SRI) Hash -->
+  <script 
+    src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js" 
+    integrity="sha384-O6jQJ9hO2hT3oYnI6q+zK9a7Gv8wE4uC+J7uV6QxO+H7E4E9I5Q7G3x0z8E3B6" 
+    crossorigin="anonymous">
+  </script>
+</head>
+<body>
+  <h1>Hardened Enterprise HTML Environment</h1>
+  <div id="secure-content">Strict CSP Active</div>
+
+  <!-- Valid Nonce: Browser Executes Safely -->
+  <script nonce="kwasSecureRandom2026">
+    console.log("✅ Authenticated script executed with valid cryptographic nonce.");
+  </script>
+
+  <!-- Missing Nonce: Browser Blocks and Reports Violation -->
+  <!-- <script>alert('Blocked by browser CSP!');</script> -->
+</body>
+</html>`,
+            executable: true,
+            explanation: [
+              "script-src 'nonce-...' instructs the browser to execute only scripts carrying the exact matching random cryptographic nonce token generated per-request.",
+              "integrity='sha384-...' verifies that the CDN file has not been tampered with or modified by a malicious third party.",
+              "require-trusted-types-for 'script' locks down dangerous sinks like element.innerHTML and eval().",
+              "object-src 'none' disables legacy Flash and Java applet plugins completely.",
+            ],
+          },
+          detailedExplanation: [
+            "Trusted Types API: When Trusted Types is enabled, assigning raw strings to `element.innerHTML` throws a TypeError. Developers must create a sanitization policy (`trustedTypes.createPolicy(...)`) that explicitly validates and sanitizes input before passing it into DOM sinks.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Using 'unsafe-inline' and 'unsafe-eval' in script-src directives, defeating CSP protection.",
+              badCode: "script-src 'self' 'unsafe-inline' 'unsafe-eval';",
+              goodCode: "script-src 'self' 'nonce-RANDOM_VALUE' 'strict-dynamic';",
+              explanation: "'unsafe-inline' allows any injected <script> tag to execute freely, rendering CSP ineffective against XSS.",
+            },
+          ],
+          bestPractices: [
+            "Generate unique, cryptographically random nonces on the server for every single HTTP response.",
+            "Always attach SRI `integrity` hashes to external CDN script tags.",
+            "Use `report-uri` or `report-to` directives to log CSP violation telemetry to your security monitoring service.",
+          ],
+          summary: [
+            "CSP Level 3 uses cryptographic nonces to defeat Cross-Site Scripting (XSS).",
+            "Trusted Types prevents DOM-based injection vulnerabilities at dangerous DOM sinks.",
+            "Subresource Integrity (SRI) guarantees external CDN binaries have not been altered.",
+          ],
+        },
+      ],
+    },
   ],
 };

@@ -12,6 +12,10 @@ import { javaCourse } from "./java";
 import { cppCourse } from "./cpp";
 import { goCourse } from "./go";
 import { rustCourse } from "./rust";
+import { kotlinCourse } from "./kotlin";
+import { swiftCourse } from "./swift";
+import { csharpCourse } from "./csharp";
+import { linuxCourse } from "./linux";
 import { dsaCourse } from "./dsa";
 import { systemDesignCourse } from "./systemDesign";
 import { devopsCourse } from "./devops";
@@ -32,6 +36,10 @@ export const COURSES: Course[] = [
   cppCourse,
   goCourse,
   rustCourse,
+  kotlinCourse,
+  swiftCourse,
+  csharpCourse,
+  linuxCourse,
   dsaCourse,
   systemDesignCourse,
   devopsCourse,

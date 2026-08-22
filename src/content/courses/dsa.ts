@@ -417,5 +417,644 @@ export const dsaCourse: Course = {
         },
       ],
     },
+    {
+      id: "mod-dsa-12",
+      slug: "cache-conscious-btree-bplus-trees",
+      title: "Module 12: Cache-Conscious Data Structures: B-Trees & B+ Trees",
+      description: "Master modern memory hierarchy algorithms: Cache-Conscious Trees, B-Tree and B+ Tree node layout, and reducing L1/L2 CPU cache misses.",
+      lessons: [
+        {
+          id: "dsa-cache-conscious-btrees",
+          slug: "cache-conscious-algorithms-btree-bplus-tree-node-layout",
+          courseSlug: "dsa",
+          moduleSlug: "cache-conscious-btree-bplus-trees",
+          title: "Cache-Conscious Data Structures: B-Trees & B+ Trees",
+          description: "Explore hardware cache-optimized algorithms: why standard pointer-chasing binary trees (AVL, Red-Black) suffer 95% CPU cache misses, designing Cache-Conscious B-Trees with 64-byte/4KB block nodes, B+ Tree leaf linked lists, and minimizing memory stalls.",
+          durationMinutes: 26,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "Hardware CPU Cache latency: L1 Cache (1ns) vs L3 (12ns) vs Main RAM (60ns / 200 CPU cycles)",
+            "Why Binary Search Trees (std::map, TreeMap) perform poorly on modern CPUs due to pointer chasing",
+            "The architecture of B-Trees: multi-way search trees with high branching factor matching CPU cache lines (64 bytes)",
+            "B+ Tree leaf sequencing for sequential scanning in relational database storage engines",
+          ],
+          introduction: `In theoretical computer science, a Red-Black Tree and a B-Tree both offer O(log N) lookup complexity. However, on modern CPU hardware where memory access is 100x slower than computation, theoretical Big-O fails to model reality. Pointer-heavy binary trees scatter nodes randomly across memory, causing a hardware CPU cache miss at every single tree depth. Cache-conscious B-Trees pack multiple keys into contiguous 64-byte array blocks, fitting entire search nodes into a single L1 CPU cache line.`,
+          whyItMatters: `Modern database engines (PostgreSQL, MySQL InnoDB, SQLite) and high-performance in-memory indexes (B-Tree Map) rely on cache-conscious B+ Trees to achieve 5x-10x higher lookup speeds than binary trees.`,
+          syntax: `class BTreeNode {\n  int keys[CACHE_LINE_SIZE / sizeof(int)];\n  BTreeNode* children[...];\n}`,
+          mainExample: {
+            title: "Simulating a Contiguous Cache-Line Friendly B-Tree Node Search",
+            language: "javascript",
+            code: `// Cache-Conscious Multi-Way Search Node Simulation
+class CacheConsciousBNode {
+    constructor(order = 8) {
+        this.order = order;
+        // Keys stored contiguously in a flat array (Fits directly in CPU L1 Cache!)
+        this.keys = [];
+        this.children = [];
+        this.isLeaf = true;
+    }
+
+    // Binary search within contiguous array (Extremely cache-friendly!)
+    search(target) {
+        let low = 0;
+        let high = this.keys.length - 1;
+
+        while (low <= high) {
+            const mid = (low + high) >>> 1;
+            if (this.keys[mid] === target) {
+                return { found: true, index: mid };
+            } else if (this.keys[mid] < target) {
+                low = mid + 1;
+            } else {
+                high = mid - 1;
+            }
+        }
+
+        // If not found and is leaf, key does not exist
+        if (this.isLeaf) return { found: false };
+
+        // Otherwise, descend to child node at pointer index 'low'
+        return this.children[low].search(target);
+    }
+
+    insertNonFull(key) {
+        let i = this.keys.length - 1;
+        if (this.isLeaf) {
+            // Insert into sorted contiguous array
+            this.keys.push(null);
+            while (i >= 0 && this.keys[i] > key) {
+                this.keys[i + 1] = this.keys[i];
+                i--;
+            }
+            this.keys[i + 1] = key;
+        }
+    }
+}
+
+// Verification
+const root = new CacheConsciousBNode(8);
+[10, 20, 30, 40, 50, 60, 70].forEach(k => root.insertNonFull(k));
+
+console.log("=== Cache-Conscious B-Tree Node Search ===");
+console.log("Searching for 40:", root.search(40));
+console.log("Searching for 99:", root.search(99));
+console.log("✅ Contiguous keys scanned with zero pointer-chasing cache misses!");`,
+            executable: true,
+            explanation: [
+              "Contiguous array storage guarantees all keys in the node are loaded into the L1 CPU cache in a single 64-byte memory fetch.",
+              "Binary trees allocate left and right pointers separately on the heap, forcing a random RAM lookup (~60ns) at every tree level.",
+              "A B-Tree with branching factor 128 can index 1,000,000 items with a tree height of only 3 (3 cache misses vs 20 cache misses in AVL!).",
+              "B+ Trees store data pointers only at leaf nodes, allowing internal routing nodes to hold hundreds of keys.",
+            ],
+          },
+          detailedExplanation: [
+            "Cache Line Alignment: On x86 and ARM processors, memory is transferred from RAM to L1 cache in 64-byte blocks (cache lines). By sizing node structs to exactly 64 or 128 bytes, searching a node loads all branch keys with zero wasted memory bandwidth.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Choosing Red-Black Trees (`std::map`, `TreeMap`) for large in-memory datasets instead of flat B-Trees (`absl::btree_map`).",
+              badCode: "std::map<int, Data> index; // Scatters millions of node pointers across heap",
+              goodCode: "absl::btree_map<int, Data> index; // 5x faster due to contiguous cache lines",
+              explanation: "Pointer chasing in binary search trees causes high CPU stall cycles. B-Tree maps dramatically outperform binary trees on modern hardware.",
+            },
+          ],
+          bestPractices: [
+            "Use B-Trees for in-memory associative lookups where performance is critical.",
+            "Use B+ Trees for disk-based storage engines to maximize sequential range scan throughput.",
+            "Align tree node structures to 64-byte cache boundaries.",
+          ],
+          summary: [
+            "Hardware memory latency dominates algorithmic performance on modern CPUs.",
+            "B-Trees eliminate pointer chasing by packing keys into contiguous cache-line nodes.",
+            "B+ Trees power modern high-scale relational database indexes and file systems.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-dsa-13",
+      slug: "succinct-compressed-data-structures",
+      title: "Module 13: Succinct & Compressed Data Structures: Roaring Bitmaps",
+      description: "Master compressed data structures: Roaring Bitmaps, Bitsets, Rank/Select operations, and Succinct Wavelet Trees.",
+      lessons: [
+        {
+          id: "dsa-roaring-bitmaps",
+          slug: "succinct-data-structures-roaring-bitmaps-rank-select",
+          courseSlug: "dsa",
+          moduleSlug: "succinct-compressed-data-structures",
+          title: "Succinct Data Structures: Roaring Bitmaps & Rank/Select",
+          description: "Represent massive datasets in compressed memory with Succinct Data Structures: Roaring Bitmaps (Array Containers, Bitmap Containers, Run-Length Encoded RLE Containers), Rank and Select operations on bit vectors, and Wavelet Trees.",
+          durationMinutes: 26,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "The concept of Succinct Data Structures: operating directly on compressed data without decompressing",
+            "The 3 internal containers of Roaring Bitmaps: Array (sparse), Bitset (dense), and Run (contiguous ranges)",
+            "How Lucene, Elasticsearch, Spark, and Redis use Roaring Bitmaps for high-speed set intersections (AND/OR)",
+            "Rank and Select primitive queries in constant O(1) time",
+          ],
+          introduction: `Storing sets containing millions of integers (such as user IDs, document IDs in search engines, or analytics tags) requires hundreds of megabytes of RAM if using standard HashSets. A standard bitset consumes fixed memory regardless of density. Roaring Bitmaps partition 32-bit integers by their top 16 bits and dynamically choose between sparse 16-bit integer arrays, uncompressed bitsets, or Run-Length Encoding (RLE) to achieve up to 100x compression with sub-microsecond set intersection speeds.`,
+          whyItMatters: `Search engines (Elasticsearch, Apache Lucene) and distributed analytical databases (ClickHouse, Apache Spark, Druid) use Roaring Bitmaps to intersect billion-record filter queries in milliseconds.`,
+          syntax: `// Roaring Bitmap Container Selection\nif (count < 4096) ArrayContainer(uint16[])\nelse BitsetContainer(uint64[1024])`,
+          mainExample: {
+            title: "Simulating Roaring Bitmap Dynamic Container Selection and Set Intersection",
+            language: "javascript",
+            code: `// Roaring Bitmap Dynamic Container Architecture Simulation
+class SimpleRoaringBitmap {
+    constructor() {
+        // Map high 16-bit chunk -> Container
+        this.chunks = new Map();
+    }
+
+    add(val) {
+        const chunkKey = (val >>> 16) & 0xFFFF;
+        const lowVal = val & 0xFFFF;
+
+        if (!this.chunks.has(chunkKey)) {
+            // Start with sparse Array Container
+            this.chunks.set(chunkKey, { type: 'ARRAY', data: [] });
+        }
+
+        const container = this.chunks.get(chunkKey);
+        if (container.type === 'ARRAY') {
+            if (!container.data.includes(lowVal)) {
+                container.data.push(lowVal);
+                container.data.sort((a, b) => a - b);
+            }
+            // If cardinality exceeds 4,096 elements, convert to Bitset Container!
+            if (container.data.length > 4096) {
+                const bitset = new Uint32Array(2048); // 65,536 bits
+                container.data.forEach(v => bitset[v >>> 5] |= (1 << (v & 31)));
+                container.type = 'BITSET';
+                container.data = bitset;
+            }
+        } else if (container.type === 'BITSET') {
+            container.data[lowVal >>> 5] |= (1 << (lowVal & 31));
+        }
+    }
+
+    has(val) {
+        const chunkKey = (val >>> 16) & 0xFFFF;
+        const lowVal = val & 0xFFFF;
+        const container = this.chunks.get(chunkKey);
+        if (!container) return false;
+
+        if (container.type === 'ARRAY') {
+            return container.data.includes(lowVal);
+        } else if (container.type === 'BITSET') {
+            return (container.data[lowVal >>> 5] & (1 << (lowVal & 31))) !== 0;
+        }
+        return false;
+    }
+}
+
+const rb = new SimpleRoaringBitmap();
+rb.add(105);
+rb.add(65536 + 10); // Spans into chunk #1
+
+console.log("=== Roaring Bitmap Hybrid Container Engine ===");
+console.log("Contains 105:", rb.has(105));
+console.log("Contains 65546:", rb.has(65536 + 10));
+console.log("Contains 999:", rb.has(999));
+console.log("✅ Adaptive memory compression active across chunk boundaries!");`,
+            executable: true,
+            explanation: [
+              "Integers are partitioned by their upper 16 bits into independent 65,536-element chunks.",
+              "Sparse chunks (<4096 elements) use sorted 16-bit integer arrays (ArrayContainer), using only 2 bytes per integer.",
+              "Dense chunks (>4096 elements) convert to fixed 8KB bitsets (BitsetContainer), enabling single-cycle SIMD bitwise AND operations.",
+              "Contiguous sequential ranges convert to Run-Length Encoded (RLE) containers, storing millions of items in only 4 bytes.",
+            ],
+          },
+          detailedExplanation: [
+            "Rank and Select Queries: Rank(i) returns the number of 1-bits before index i in O(1) time using pre-computed block sum lookup tables. Select(j) returns the index of the j-th 1-bit. These two operations form the foundation of compressed full-text search indexes (FM-Index).",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Using standard uncompressed `HashSet<Long>` in Java/C# for massive user tracking, exhausting gigabytes of heap RAM.",
+              badCode: "Set<Long> userIds = new HashSet<>(); // 32 bytes of overhead per number!",
+              goodCode: "RoaringBitmap userIds = new RoaringBitmap(); // ~0.5 to 2 bits per number",
+              explanation: "Standard HashSets box primitives into heap objects with 32 bytes of object header overhead. Roaring Bitmaps compress integers down to fractions of a byte.",
+            },
+          ],
+          bestPractices: [
+            "Use Roaring Bitmaps for high-cardinality search filtering and tag intersection.",
+            "Use SIMD-accelerated bitwise instructions (AVX2/AVX-512) for parallel bitmap AND/OR intersections.",
+            "Store inverted index posting lists as Roaring Bitmaps for instant search filtering.",
+          ],
+          summary: [
+            "Roaring Bitmaps adaptively switch between Array, Bitset, and RLE containers.",
+            "Enables sub-microsecond set intersection with up to 100x memory compression.",
+            "Widely adopted by Elasticsearch, Lucene, Spark, and high-performance databases.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-dsa-14",
+      slug: "lock-free-concurrency-treiber-cas",
+      title: "Module 14: Lock-Free Concurrency Algorithms: Stacks & Queues",
+      description: "Master lockless algorithm design: Treiber Stack, Michael-Scott Lock-Free Queue, Compare-And-Swap (CAS), and the ABA problem.",
+      lessons: [
+        {
+          id: "dsa-lockfree-queues",
+          slug: "lock-free-data-structures-treiber-stack-michael-scott-queue-cas",
+          courseSlug: "dsa",
+          moduleSlug: "lock-free-concurrency-treiber-cas",
+          title: "Lock-Free Algorithms: Treiber Stack & Michael-Scott Queue",
+          description: "Design wait-free and lock-free concurrent algorithms: Compare-And-Swap (CAS) consensus, lock-free Treiber Stack, the Michael-Scott non-blocking FIFO Queue, and solving the ABA problem with tagged pointers.",
+          durationMinutes: 28,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "The hierarchy of non-blocking concurrency: Obstruction-Free vs Lock-Free vs Wait-Free",
+            "Atomic hardware primitives: Compare-And-Swap (CAS) and Fetch-And-Add (FAA)",
+            "The Michael-Scott Lock-Free Queue algorithm (foundation of Java's ConcurrentLinkedQueue)",
+            "The ABA Problem and solving it with versioned/tagged atomic pointers",
+          ],
+          introduction: `Concurrent data structures that rely on mutual exclusion locks (mutexes) suffer from priority inversion, deadlock risks, and high context-switching overhead. Lock-free algorithms guarantee system-wide progress without locks: even if some threads are suspended or delayed by the OS, at least one thread is guaranteed to complete its operation in a bounded number of steps.`,
+          whyItMatters: `High-throughput asynchronous runtimes (Tokio, .NET ThreadPool, Go runtime) and financial trading systems rely on lock-free stacks and queues to schedule millions of tasks per second without lock contention.`,
+          syntax: `while (!CAS(&head, oldHead, newHead)) {\n    oldHead = head;\n}`,
+          mainExample: {
+            title: "Simulating a Lock-Free Michael-Scott Non-Blocking FIFO Queue with Atomic CAS",
+            language: "javascript",
+            code: `// Conceptual Lock-Free Michael-Scott Queue Simulation
+class Node {
+    constructor(value) {
+        this.value = value;
+        this.next = null;
+    }
+}
+
+class LockFreeQueue {
+    constructor() {
+        // Dummy sentinel node
+        const sentinel = new Node(null);
+        this.head = sentinel;
+        this.tail = sentinel;
+    }
+
+    // Atomic CAS Simulation Helper
+    _cas(obj, field, expected, update) {
+        if (obj[field] === expected) {
+            obj[field] = update;
+            return true;
+        }
+        return false;
+    }
+
+    enqueue(val) {
+        const newNode = new Node(val);
+        while (true) {
+            const curTail = this.tail;
+            const tailNext = curTail.next;
+
+            if (curTail === this.tail) {
+                if (tailNext === null) {
+                    // Try to link newNode at the end of the list
+                    if (this._cas(curTail, 'next', null, newNode)) {
+                        // Advance tail to new node (Helpful step)
+                        this._cas(this, 'tail', curTail, newNode);
+                        return;
+                    }
+                } else {
+                    // Tail was lagging behind; help advance it
+                    this._cas(this, 'tail', curTail, tailNext);
+                }
+            }
+        }
+    }
+
+    dequeue() {
+        while (true) {
+            const curHead = this.head;
+            const curTail = this.tail;
+            const headNext = curHead.next;
+
+            if (curHead === this.head) {
+                if (curHead === curTail) {
+                    if (headNext === null) return null; // Queue Empty
+                    // Advance lagging tail
+                    this._cas(this, 'tail', curTail, headNext);
+                } else {
+                    const value = headNext.value;
+                    if (this._cas(this, 'head', curHead, headNext)) {
+                        return value; // Dequeued successfully!
+                    }
+                }
+            }
+        }
+    }
+}
+
+const queue = new LockFreeQueue();
+queue.enqueue("TASK_101");
+queue.enqueue("TASK_102");
+console.log("=== Lock-Free Michael-Scott Queue ===");
+console.log("Dequeued:", queue.dequeue());
+console.log("Dequeued:", queue.dequeue());
+console.log("Dequeued (Empty):", queue.dequeue());
+console.log("✅ Queue executed without locking or thread suspension!");`,
+            executable: true,
+            explanation: [
+              "The Michael-Scott queue uses a dummy sentinel node so head and tail always point to valid nodes.",
+              "Enqueuing uses CAS to atomically append a node and advance the tail pointer.",
+              "If a thread is preempted halfway through an enqueue, other threads 'help' advance the lagging tail pointer, guaranteeing lock-freedom.",
+              "Dequeuing atomically moves the head pointer forward via CAS, reading the next node's value in O(1) time.",
+            ],
+          },
+          detailedExplanation: [
+            "The ABA Problem: Thread 1 reads pointer A. Thread 2 pops A, frees it, pushes B, and pushes a newly allocated node that happens to share the same physical address A. Thread 1's CAS succeeds even though the list changed. Tagged pointers (storing a 16-bit incrementing counter alongside the pointer) prevent the ABA problem.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Assuming lock-free algorithms are always faster than mutex locks for low-contention single-threaded workloads.",
+              badCode: "// Using complex CAS retry loops on thread-confined collections",
+              goodCode: "// Use lock-free structures specifically when multiple threads contend concurrently",
+              explanation: "Under zero contention, simple sequential data structures are faster due to lack of memory barrier instructions. Lock-free shines under concurrent thread contention.",
+            },
+          ],
+          bestPractices: [
+            "Use tagged/versioned pointers (`AtomicStampedReference` in Java) to eliminate the ABA problem.",
+            "Use helping mechanisms so lagging threads do not block forward progress of active threads.",
+            "Rely on battle-tested standard libraries (`ConcurrentLinkedQueue`, `crossbeam::queue`) in production.",
+          ],
+          summary: [
+            "Lock-free algorithms guarantee system-wide forward progress using hardware atomic CAS instructions.",
+            "The Michael-Scott Queue provides high-concurrency FIFO buffering without mutex locks.",
+            "Tagged pointers and epoch memory reclamation solve the concurrent ABA problem.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-dsa-15",
+      slug: "advanced-graph-network-flows-dinic",
+      title: "Module 15: Advanced Graph Network Flows: Dinic's Algorithm",
+      description: "Master Maximum Network Flow algorithms: Residual Graphs, Augmenting Paths, Dinic's blocking flow algorithm, and Hopcroft-Karp Bipartite Matching.",
+      lessons: [
+        {
+          id: "dsa-dinic-network-flow",
+          slug: "advanced-graph-algorithms-dinics-network-flow-bipartite-matching",
+          courseSlug: "dsa",
+          moduleSlug: "advanced-graph-network-flows-dinic",
+          title: "Network Flow Algorithms: Dinic's & Bipartite Matching",
+          description: "Solve complex network routing and assignment problems: Maximum Flow / Minimum Cut theorem, Residual graphs, Dinic's Algorithm using BFS Level Graphs and DFS Blocking Flows in O(V²E) time, and Hopcroft-Karp Bipartite Matching.",
+          durationMinutes: 28,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "The Max-Flow Min-Cut Theorem and Ford-Fulkerson foundations",
+            "Why Edmonds-Karp is slow (O(V E²)) and how Dinic's algorithm optimizes flow to O(V² E)",
+            "Constructing BFS Level Graphs and pushing blocking flows via DFS with pointer pruning",
+            "Solving Maximum Bipartite Matching in O(E √V) with Hopcroft-Karp",
+          ],
+          introduction: `Network Flow algorithms model how resources (liquid in pipes, network packets in routers, traffic in road grids, tasks assigned to workers) can flow through a directed capacity-constrained graph from a Source (S) to a Sink (T). Dinic's algorithm is one of the most efficient Max-Flow algorithms in computer science: it builds a layered BFS Level Graph and pushes multiple Augmenting Paths simultaneously via DFS Blocking Flows.`,
+          whyItMatters: `Network flow algorithms power airline crew scheduling, ride-share dispatch matching (Uber/Lyft driver assignment), image segmentation in computer vision, and network routing throughput optimization.`,
+          syntax: `// Dinic's Flow Loop\nwhile (bfs_build_level_graph()) {\n    while (flow = dfs_blocking_flow(s, t, INF)) max_flow += flow;\n}`,
+          mainExample: {
+            title: "Implementing Dinic's Maximum Network Flow Algorithm",
+            language: "javascript",
+            code: `// Dinic's Maximum Network Flow Algorithm Implementation
+class Edge {
+    constructor(to, cap, flow = 0, revIndex = 0) {
+        this.to = to;
+        this.cap = cap;
+        this.flow = flow;
+        this.revIndex = revIndex; // Index of reverse residual edge
+    }
+}
+
+class DinicMaxFlow {
+    constructor(numVertices) {
+        this.V = numVertices;
+        this.adj = Array.from({ length: numVertices }, () => []);
+        this.level = new Array(numVertices);
+        this.ptr = new Array(numVertices); // DFS edge pointer for pruning
+    }
+
+    addEdge(from, to, capacity) {
+        const forward = new Edge(to, capacity, 0, this.adj[to].length);
+        const backward = new Edge(from, 0, 0, this.adj[from].length);
+        this.adj[from].push(forward);
+        this.adj[to].push(backward);
+    }
+
+    // Step 1: BFS to build layered level graph
+    bfs(source, sink) {
+        this.level.fill(-1);
+        this.level[source] = 0;
+        const queue = [source];
+
+        while (queue.length > 0) {
+            const u = queue.shift();
+            for (const edge of this.adj[u]) {
+                if (edge.cap - edge.flow > 0 && this.level[edge.to] === -1) {
+                    this.level[edge.to] = this.level[u] + 1;
+                    queue.push(edge.to);
+                }
+            }
+        }
+        return this.level[sink] !== -1;
+    }
+
+    // Step 2: DFS to push blocking flow along level graph
+    dfs(u, sink, pushed) {
+        if (pushed === 0 || u === sink) return pushed;
+
+        for (let cid = this.ptr[u]; cid < this.adj[u].length; cid++) {
+            this.ptr[u] = cid;
+            const edge = this.adj[u][cid];
+            const tr = edge.to;
+
+            if (this.level[u] + 1 !== this.level[tr] || edge.cap - edge.flow === 0) continue;
+
+            const pushable = Math.min(pushed, edge.cap - edge.flow);
+            const flow = this.dfs(tr, sink, pushable);
+
+            if (flow > 0) {
+                edge.flow += flow;
+                this.adj[tr][edge.revIndex].flow -= flow;
+                return flow;
+            }
+        }
+        return 0;
+    }
+
+    computeMaxFlow(source, sink) {
+        let totalFlow = 0;
+        while (this.bfs(source, sink)) {
+            this.ptr.fill(0);
+            while (true) {
+                const pushed = this.dfs(source, sink, Infinity);
+                if (pushed === 0) break;
+                totalFlow += pushed;
+            }
+        }
+        return totalFlow;
+    }
+}
+
+// Verification Graph: Source (0) -> (1, 2) -> Sink (3)
+const dinic = new DinicMaxFlow(4);
+dinic.addEdge(0, 1, 10);
+dinic.addEdge(0, 2, 10);
+dinic.addEdge(1, 2, 2);
+dinic.addEdge(1, 3, 4);
+dinic.addEdge(2, 3, 9);
+
+const maxFlow = dinic.computeMaxFlow(0, 3);
+console.log("=== Dinic's Maximum Network Flow Algorithm ===");
+console.log("Computed Maximum Flow:", maxFlow); // Expected: 13
+console.log("✅ Optimal bottleneck capacity computed in O(V²E) time!");`,
+            executable: true,
+            explanation: [
+              "bfs() builds a Level Graph ensuring DFS only explores edges that advance strictly forward (level[u] + 1 == level[v]).",
+              "ptr array tracks explored edges in DFS, preventing visiting saturated edges multiple times (Dead-End Elimination).",
+              "Reverse edges allow undoing previous suboptimal flow allocations dynamically.",
+              "Max-Flow Min-Cut Theorem guarantees that max flow equals the minimum capacity bottleneck cut separating S from T.",
+            ],
+          },
+          detailedExplanation: [
+            "Bipartite Matching with Dinic: Any Maximum Bipartite Matching problem (e.g. matching N job applicants to M job vacancies) can be modeled as Max-Flow in O(E √V) time by creating a Source connected to all applicants with capacity 1, and connecting all jobs to a Sink with capacity 1.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Omitting reverse residual edges with negative flow adjustments, preventing the algorithm from routing around suboptimal paths.",
+              badCode: "// Adding only forward edge without backward edge",
+              goodCode: "adj[from].push(forward); adj[to].push(backwardWithZeroCap);",
+              explanation: "Without reverse residual edges, the flow network cannot 'push back' flow if a better global route is discovered later.",
+            },
+          ],
+          bestPractices: [
+            "Use Dinic's algorithm for general maximum flow networks.",
+            "Use Hopcroft-Karp when specifically solving Maximum Bipartite Matching for O(E √V) performance.",
+            "Reset edge pointers (`ptr.fill(0)`) before each DFS blocking flow phase.",
+          ],
+          summary: [
+            "Network Flow algorithms calculate maximum capacity routing from Source to Sink.",
+            "Dinic's algorithm combines BFS Level Graphs with DFS Blocking Flows in O(V² E).",
+            "Max-Flow Min-Cut theorem solves network routing, matching, and image segmentation problems.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-dsa-16",
+      slug: "probabilistic-data-structures-hyperloglog",
+      title: "Module 16: Probabilistic Streaming Algorithms: HyperLogLog & Sketches",
+      description: "Master streaming probabilistic algorithms: HyperLogLog (HLL) cardinality estimation, Count-Min Sketch frequency, and Bloom/Cuckoo Filters.",
+      lessons: [
+        {
+          id: "dsa-hyperloglog-sketches",
+          slug: "probabilistic-data-structures-hyperloglog-count-min-sketch-bloom",
+          courseSlug: "dsa",
+          moduleSlug: "probabilistic-data-structures-hyperloglog",
+          title: "Probabilistic Algorithms: HyperLogLog & Count-Min Sketch",
+          description: "Process massive streaming big data in fixed memory with Probabilistic Algorithms: HyperLogLog (counting 1 billion unique users in 1.5KB RAM), Count-Min Sketch for frequency estimation, and Cuckoo Filters for dynamic item deletion.",
+          durationMinutes: 26,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "The trade-off of Probabilistic Data Structures: trading 1% precision for a 99.9% memory reduction",
+            "How HyperLogLog (HLL) estimates unique cardinality by observing maximum leading zeros in hash values",
+            "Harmonic Mean and register bucket bias correction in the Flajolet-Martin algorithm",
+            "Count-Min Sketch: estimating event frequencies in high-throughput network packet streams",
+          ],
+          introduction: `Counting the exact number of unique visitors (cardinality) across 1,000,000,000 requests using a HashSet requires ~16GB of RAM. The HyperLogLog (HLL) algorithm accomplishes this with a typical error rate of ~1% while consuming only 1.5 Kilobytes of memory. By observing the distribution of leading zeros in uniform cryptographic hash values across multiple register buckets, HLL computes accurate cardinality estimates in constant O(1) space.`,
+          whyItMatters: `Redis (\`PFADD\`, \`PFCOUNT\`), Google BigQuery (\`APPROX_COUNT_DISTINCT\`), and Cloudflare analytics track billions of unique daily users in real time using HyperLogLog.`,
+          syntax: `// Redis CLI HyperLogLog\nPFADD visitors "user_101" "user_102"\nPFCOUNT visitors // Estimated cardinality in 1.5KB RAM`,
+          mainExample: {
+            title: "Simulating HyperLogLog Cardinality Estimation with Bucket Registers",
+            language: "javascript",
+            code: `// HyperLogLog (HLL) Cardinality Estimator Simulation
+class SimpleHyperLogLog {
+    constructor(b = 6) {
+        this.b = b; // 2^b registers (e.g. 2^6 = 64 bucket registers)
+        this.m = 1 << b;
+        this.registers = new Uint8Array(this.m);
+        // Alpha constant for 64 buckets
+        this.alpha = 0.709;
+    }
+
+    // 32-bit Integer Hash Function (Murmur-like bit mixer)
+    _hash(str) {
+        let h = 2166136261 >>> 0;
+        for (let i = 0; i < str.length; i++) {
+            h ^= str.charCodeAt(i);
+            h = Math.imul(h, 16777619) >>> 0;
+        }
+        return h;
+    }
+
+    // Count leading zeros after bucket index
+    _clz(val) {
+        if (val === 0) return 32 - this.b;
+        return Math.clz32(val);
+    }
+
+    add(item) {
+        const hash = this._hash(item);
+        // Extract bucket register index from first 'b' bits
+        const bucketIndex = hash >>> (32 - this.b);
+        // Extract remaining hash bits
+        const remainingBits = (hash << this.b) >>> 0;
+        const leadingZeros = this._clz(remainingBits) + 1;
+
+        // Keep maximum observed leading zeros in bucket register
+        if (leadingZeros > this.registers[bucketIndex]) {
+            this.registers[bucketIndex] = leadingZeros;
+        }
+    }
+
+    count() {
+        // Compute Harmonic Mean of registers to reduce outlier variance
+        let sum = 0;
+        for (let i = 0; i < this.m; i++) {
+            sum += Math.pow(2, -this.registers[i]);
+        }
+        const rawEstimate = (this.alpha * this.m * this.m) / sum;
+        return Math.round(rawEstimate);
+    }
+}
+
+const hll = new SimpleHyperLogLog(6); // 64 registers
+// Add 500 unique simulated items
+for (let i = 1; i <= 500; i++) {
+    hll.add("user_account_id_" + i);
+}
+
+console.log("=== Probabilistic HyperLogLog Cardinality Engine ===");
+console.log("Actual Unique Elements Inserted: 500");
+console.log("HyperLogLog Estimated Count:     ", hll.count());
+console.log("Total Memory Consumed by HLL:    ", hll.registers.length, "bytes (Tiny 64-byte footprint!)");
+console.log("✅ Estimated 500 unique items within standard HLL error bounds!");`,
+            executable: true,
+            explanation: [
+              "Uniform hashing distributes values evenly: finding a hash with K leading zeros has a 1 in 2^K probability.",
+              "If the maximum observed leading zeros in a bucket is 6, we estimate that bucket has seen ~2^6 = 64 unique items.",
+              "Partitioning into M buckets and taking the Harmonic Mean eliminates outlier bias.",
+              "Standard 1.5KB HyperLogLog (1024 registers of 5 bits) counts up to billions with an error rate under 1.04 / sqrt(m) ≈ 1.04 / 32 ≈ 3.25%.",
+            ],
+          },
+          detailedExplanation: [
+            "Count-Min Sketch: While HLL counts unique cardinality, Count-Min Sketch estimates frequency (how many times did item X appear in the stream?). It uses D independent hash functions to increment counters across a 2D matrix, returning the minimum counter value for queries with zero false negatives.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Using HyperLogLog when exact 100% precision is legally or mathematically required (e.g. financial bank balance calculations).",
+              badCode: "// Using HLL for exact billing invoices",
+              goodCode: "// Use exact database COUNT(DISTINCT) for financial billing; use HLL for analytics dashboards",
+              explanation: "HyperLogLog is an approximation algorithm. It is ideal for metrics and analytics, but should not be used where exact precision is required.",
+            },
+          ],
+          bestPractices: [
+            "Use Redis `PFADD` / `PFCOUNT` for tracking unique daily active users (DAU) across millions of visitors.",
+            "Use Count-Min Sketch for tracking top-K heavy hitters and rate limiting in network firewalls.",
+            "Use Cuckoo Filters instead of Bloom Filters if your system requires deleting items dynamically.",
+          ],
+          summary: [
+            "Probabilistic data structures trade minimal precision for 99.9% memory savings.",
+            "HyperLogLog estimates unique cardinality across billions of items in 1.5KB RAM.",
+            "Count-Min Sketch and Bloom Filters provide constant-space frequency and membership testing.",
+          ],
+        },
+      ],
+    },
   ],
 };

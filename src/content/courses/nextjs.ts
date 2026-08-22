@@ -417,5 +417,457 @@ export const nextjsCourse: Course = {
         },
       ],
     },
+    {
+      id: "mod-next-12",
+      slug: "turbopack-bundler-internals",
+      title: "Module 12: Turbopack Engine, Incremental Graphs & Tree Shaking",
+      description: "Understand Turbopack's Rust-based incremental computation engine, turbo task graphs, and tree-shaking optimizations.",
+      lessons: [
+        {
+          id: "next-turbopack",
+          slug: "turbopack-architecture-incremental-computation-bundling",
+          courseSlug: "nextjs",
+          moduleSlug: "turbopack-bundler-internals",
+          title: "Turbopack Architecture & Incremental Computation",
+          description: "Explore Turbopack: the Rust-powered successor to Webpack. Master Turbo-Tasks function-level caching, persistent incremental dependency graphs, and AST tree-shaking algorithms.",
+          durationMinutes: 24,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "Why Webpack slows down linearly with codebase size (O(n)) while Turbopack scales based on page requests (O(1))",
+            "The Turbo Engine (Turbo-Tasks) and function-level reactive computation graphs",
+            "How Turbopack bundles Server Components, Client Components, and CSS Modules in parallel",
+            "Optimizing tree-shaking and eliminating unused barrel exports (`optimizePackageImports`)",
+          ],
+          introduction: `Turbopack is an incremental bundler written in Rust designed specifically for Next.js. Unlike traditional bundlers that rebuild large dependency graphs on every change, Turbopack models your entire project as a reactive computation graph of pure functions that cache their results at the function level.`,
+          whyItMatters: `For enterprise Next.js applications with thousands of routes and modules, Turbopack reduces local dev server startup and hot-module replacement (HMR) times from minutes to sub-100 milliseconds.`,
+          syntax: `// next.config.ts\nconst nextConfig = {\n  experimental: {\n    turbo: {\n      rules: { '*.svg': { loaders: ['@svgr/webpack'], as: '*.js' } }\n    }\n  }\n};`,
+          mainExample: {
+            title: "Configuring Turbopack Optimization in next.config.ts",
+            language: "typescript",
+            code: `// next.config.ts: Turbopack & Package Optimization Architecture
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  // Turbopack optimized tree-shaking for heavy UI libraries
+  experimental: {
+    optimizePackageImports: [
+      "lucide-react",
+      "@radix-ui/react-icons",
+      "date-fns",
+      "lodash-es"
+    ],
+    turbo: {
+      resolveAlias: {
+        // High-performance alias mappings in Rust engine
+        underscore: "lodash-es",
+      },
+    },
+  },
+};
+
+export default nextConfig;`,
+            executable: false,
+            explanation: [
+              "optimizePackageImports instructs Turbopack to transform barrel imports into direct file imports, skipping the evaluation of thousands of unused icons/utilities.",
+              "Turbo-Tasks computes function calls only once and caches outputs in memory, invalidating only the precise dependent nodes when a file changes.",
+              "Turbopack runs natively in compiled Rust machine code with zero V8 JavaScript startup overhead.",
+            ],
+          },
+          detailedExplanation: [
+            "Turbo Engine Reactive Graph: In Turbopack, every compilation step is a `#[turbo_tasks::function]`. When you edit a file, the Turbo runtime traces the dependency graph and re-executes only the functions affected by the changed bytes, achieving sub-millisecond HMR updates.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Importing from heavy barrel export indexes without enabling `optimizePackageImports`.",
+              badCode: "import { Calendar } from 'lucide-react'; // Imports 1,500+ unneeded icons without optimization",
+              goodCode: "// Add 'lucide-react' to next.config.ts optimizePackageImports",
+              explanation: "Without optimization, importing a single icon from a barrel file forces the compiler to parse all 1,500+ icons.",
+            },
+          ],
+          bestPractices: [
+            "Run development with `next dev --turbopack` for instant startup speeds.",
+            "List heavy component and icon libraries in `experimental.optimizePackageImports`.",
+            "Avoid circular imports to keep Turbopack's dependency graphs linear and acyclic.",
+          ],
+          summary: [
+            "Turbopack is a Rust-based incremental bundler built on Turbo-Tasks reactive graphs.",
+            "Scales with the active page being viewed rather than total project size.",
+            "`optimizePackageImports` accelerates compile times by eliminating unused barrel dependencies.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-next-13",
+      slug: "partial-prerendering-ppr",
+      title: "Module 13: Partial Prerendering (PPR): Static Shells & Dynamic Holes",
+      description: "Master Partial Prerendering (PPR): combining instant static edge caching with dynamic streaming Suspense holes.",
+      lessons: [
+        {
+          id: "next-ppr",
+          slug: "partial-prerendering-ppr-hybrid-rendering",
+          courseSlug: "nextjs",
+          moduleSlug: "partial-prerendering-ppr",
+          title: "Partial Prerendering (PPR) & Hybrid Edge Streaming",
+          description: "Eliminate the choice between Static Site Generation (SSG) and Server-Side Rendering (SSR) using Partial Prerendering (PPR) in Next.js: instant static HTML shells with embedded streaming dynamic holes.",
+          durationMinutes: 24,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "The architectural revolution of PPR: Instant 0ms TTFB static shell + streamed dynamic user data",
+            "Enabling Partial Prerendering with `experimental.ppr = 'incremental'`",
+            "Defining static boundaries and wrapping dynamic cookies/headers inside `<Suspense>` holes",
+            "How Edge CDNs serve the pre-rendered static shell while the origin server streams dynamic chunks",
+          ],
+          introduction: `Historically in web development, developers were forced to make a binary choice per page: either make it completely Static (fast TTFB from CDN, but cannot show user-specific data) or completely Dynamic (slow TTFB from origin server, blocking initial render). Partial Prerendering (PPR) combines both: the static shell (navbars, hero sections, layouts) is pre-rendered at build time and served in 0ms from the CDN, while dynamic content (user carts, live prices) is streamed into embedded Suspense holes within the same HTTP response.`,
+          whyItMatters: `PPR delivers sub-20ms Time-To-First-Byte (TTFB) and perfect Core Web Vitals (LCP) for e-commerce and SaaS dashboards while still rendering live, authenticated user data.`,
+          syntax: `export const experimental_ppr = true;\n\n<Suspense fallback={<CartSkeleton />}>\n  <DynamicUserCart />\n</Suspense>`,
+          mainExample: {
+            title: "Implementing Partial Prerendering (PPR) on an E-Commerce Page",
+            language: "typescript",
+            code: `// app/courses/[slug]/page.tsx
+import { Suspense } from "react";
+import { cookies } from "next/headers";
+
+// 1. Enable Partial Prerendering for this route
+export const experimental_ppr = true;
+
+// 2. Dynamic Component (Reads cookies -> Rendered on-demand at request time)
+async function UserEnrollmentStatus({ courseId }: { courseId: string }) {
+  const cookieStore = await cookies();
+  const sessionToken = cookieStore.get("session_token")?.value;
+  
+  // Simulate database user lookup
+  await new Promise(r => setTimeout(r, 400));
+  const isEnrolled = !!sessionToken;
+
+  return (
+    <div className="p-4 rounded-lg bg-blue-900 text-blue-100 font-semibold">
+      {isEnrolled ? "✅ Enrolled — Continue Lesson" : "⚡ Enroll Now for Free"}
+    </div>
+  );
+}
+
+// 3. Page Component: Static Shell Pre-rendered at Build Time!
+export default async function CourseDetailPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+
+  return (
+    <main className="p-8 max-w-4xl mx-auto space-y-6">
+      {/* STATIC SHELL: Instant 0ms TTFB from CDN */}
+      <header className="border-b pb-4">
+        <h1 className="text-3xl font-bold">Course: {slug.toUpperCase()}</h1>
+        <p className="text-slate-400">Master enterprise software engineering with KWAS Academy.</p>
+      </header>
+
+      {/* DYNAMIC HOLE: Streamed into HTML response over HTTP */}
+      <Suspense fallback={<div className="h-14 bg-slate-800 animate-pulse rounded-lg" />}>
+        <UserEnrollmentStatus courseId={slug} />
+      </Suspense>
+    </main>
+  );
+}`,
+            executable: false,
+            explanation: [
+              "experimental_ppr = true instructs Next.js to pre-render the static HTML shell during build time.",
+              "The <header> and layout are stored on the CDN edge and sent to the browser immediately (0ms TTFB).",
+              "The <Suspense> boundary creates a dynamic hole: the server continues streaming the evaluated <UserEnrollmentStatus> over the same open HTTP connection without client-side waterfalls.",
+            ],
+          },
+          detailedExplanation: [
+            "Under the Hood: At build time, Next.js generates a static HTML file containing the pre-rendered shell and fallback HTML. When a request arrives, the Edge CDN sends the static shell immediately and initiates a background stream to resolve the pending Suspense promises, replacing fallback markup in-place.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Accessing cookies() or searchParams at the root level of the page outside a Suspense boundary in PPR.",
+              badCode: "export default async function Page() { const c = await cookies(); return <div/>; }",
+              goodCode: "export default async function Page() { return <Suspense><DynamicChild/></Suspense>; }",
+              explanation: "Reading dynamic functions like `cookies()` or `headers()` outside `<Suspense>` opts the entire page into dynamic rendering, destroying the static shell.",
+            },
+          ],
+          bestPractices: [
+            "Enable `experimental: { ppr: 'incremental' }` in `next.config.ts`.",
+            "Keep dynamic data accesses (`cookies()`, `headers()`) isolated inside `<Suspense>` boundaries.",
+            "Provide accurate skeleton fallbacks in Suspense to prevent Cumulative Layout Shift (CLS).",
+          ],
+          summary: [
+            "PPR merges Static Site Generation with dynamic Server-Side streaming.",
+            "Static shell renders instantly from the Edge CDN in 0ms TTFB.",
+            "Dynamic user data streams seamlessly into Suspense holes over the same connection.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-next-14",
+      slug: "multi-tenant-edge-middleware",
+      title: "Module 14: Multi-Tenant Architecture, Subdomains & Edge Auth",
+      description: "Build multi-tenant SaaS applications with dynamic subdomain routing (`tenant.kwas.dev`), Edge Middleware, and JWT verification.",
+      lessons: [
+        {
+          id: "next-multitenancy",
+          slug: "nextjs-multi-tenant-subdomains-edge-middleware-auth",
+          courseSlug: "nextjs",
+          moduleSlug: "multi-tenant-edge-middleware",
+          title: "Multi-Tenant Subdomains & Edge Middleware Architecture",
+          description: "Architect scalable multi-tenant SaaS platforms in Next.js: subdomain routing (tenant.app.com), custom domain rewriting, Edge Middleware URL rewrites, and high-speed JWT authentication.",
+          durationMinutes: 24,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "The architecture of Multi-Tenant SaaS: Subdomains (`org.kwas.dev`) and Custom Domains (`org.com`)",
+            "URL Rewriting inside Edge `middleware.ts` without modifying the browser's address bar",
+            "Edge authentication: verifying JWTs in sub-millisecond V8 isolates using `jose`",
+            "Dynamic tenant isolation in database queries and caching tags",
+          ],
+          introduction: `Multi-tenancy is an architectural model where a single software instance serves multiple distinct customer organizations (tenants). In Next.js, Edge Middleware allows developers to inspect the incoming 'Host' header at the global edge network, authenticate the user, and transparently rewrite the request to tenant-specific route folders (e.g. \`app/[tenant]/...\`) in sub-millisecond latency.`,
+          whyItMatters: `Platforms like Shopify, Notion, and Vercel use multi-tenant edge routing to host millions of custom customer domains on a single unified Next.js codebase.`,
+          syntax: `// middleware.ts\nexport function middleware(req: NextRequest) {\n  const hostname = req.headers.get('host');\n  return NextResponse.rewrite(new URL(\`/\${tenant}\${req.nextUrl.pathname}\`, req.url));\n}`,
+          mainExample: {
+            title: "Production Multi-Tenant Subdomain Edge Middleware",
+            language: "typescript",
+            code: `// middleware.ts: Multi-Tenant Edge Routing Engine
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+
+export const config = {
+  matcher: ["/((?!api/|_next/|_static/|_vercel|[\\\\w-]+\\\\.\\\\w+).*)"],
+};
+
+export function middleware(req: NextRequest) {
+  const url = req.nextUrl;
+  const hostname = req.headers.get("host") || "kwasacademy.dev";
+
+  // 1. Extract tenant subdomain (e.g., 'acme.kwasacademy.dev' -> 'acme')
+  const currentHost = hostname.replace(\`:$\{process.env.PORT || 3000\}\`, "");
+  const isRootDomain = currentHost === "kwasacademy.dev" || currentHost === "localhost";
+
+  // 2. Route root domain to main marketing platform
+  if (isRootDomain) {
+    return NextResponse.rewrite(new URL(\`/home\${url.pathname}\`, req.url));
+  }
+
+  // 3. Extract Tenant ID for enterprise subdomains
+  const tenantId = currentHost.split(".")[0];
+
+  // 4. Transparently rewrite request to tenant-isolated dynamic folder: app/[tenant]/...
+  return NextResponse.rewrite(
+    new URL(\`/\${tenantId}\${url.pathname}\${url.search}\`, req.url)
+  );
+}`,
+            executable: false,
+            explanation: [
+              "NextResponse.rewrite changes the internal route path while leaving the URL in the user's browser untouched.",
+              "Requests to acme.kwasacademy.dev/dashboard are transparently routed to app/[tenant]/dashboard/page.tsx.",
+              "Edge Middleware executes across hundreds of worldwide edge nodes in sub-millisecond V8 isolates.",
+            ],
+          },
+          detailedExplanation: [
+            "Edge vs Node.js Runtime: Edge Middleware runs on lightweight V8 isolates rather than full Node.js processes. It cannot use Node.js native C++ modules or heavy ORMs, but excels at lightning-fast header routing, cookie parsing, and cryptographic JWT verification using Web Standard APIs.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Using `NextResponse.redirect` instead of `NextResponse.rewrite` for tenant routing.",
+              badCode: "return NextResponse.redirect(new URL(`/tenant/${path}`, req.url));",
+              goodCode: "return NextResponse.rewrite(new URL(`/${tenantId}${path}`, req.url));",
+              explanation: "Redirect alters the visible URL in the user's browser bar. Rewrite routes internally while preserving the user's branded custom domain.",
+            },
+          ],
+          bestPractices: [
+            "Use the `jose` library for Edge JWT verification instead of heavy `jsonwebtoken`.",
+            "Cache custom domain lookup mappings at the Edge using KV stores (Upstash or Redis).",
+            "Tag tenant database queries with tenant-scoped cache tags (`revalidateTag(\`tenant-\${id}\`)`).",
+          ],
+          summary: [
+            "Multi-tenant Next.js routes custom subdomains to isolated app folders.",
+            "Edge Middleware rewrites URLs transparently at global Edge locations.",
+            "Preserves customer branding while maintaining a single scalable codebase.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-next-15",
+      slug: "cache-internals-tag-invalidation",
+      title: "Module 15: Deep Cache Internals: Full Route Cache & Tag Invalidation",
+      description: "Master Next.js caching layers: Request Memoization, Data Cache, Full Route Cache, Router Cache, and targeted `revalidateTag`.",
+      lessons: [
+        {
+          id: "next-cache-internals",
+          slug: "nextjs-caching-deep-dive-data-cache-revalidatetag",
+          courseSlug: "nextjs",
+          moduleSlug: "cache-internals-tag-invalidation",
+          title: "Next.js Caching Architecture & On-Demand Tag Revalidation",
+          description: "Master the 4 interconnected caching layers of Next.js: Request Memoization, Data Cache, Full Route Cache, and Router Cache, alongside atomic on-demand tag revalidation with `revalidateTag()` and `revalidatePath()`.",
+          durationMinutes: 24,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "The 4 Caching Mechanisms: React Request Memoization, Next.js Data Cache, Full Route Cache, and Client Router Cache",
+            "How `fetch('https://...', { next: { tags: ['courses'] } })` binds data to the persistent Data Cache",
+            "Atomic cache invalidation using `revalidateTag('courses')` inside Server Actions",
+            "Debugging stale cache issues and controlling `unstable_cache` for database queries",
+          ],
+          introduction: `Next.js features a multi-tiered caching architecture engineered to minimize origin server computations and maximize edge response speeds. Understanding the boundary between React's temporary Request Memoization (per-render lifecycle), the persistent Next.js Data Cache (across requests and deployments), the Full Route Cache (static HTML/RSC payloads), and the client-side Router Cache is critical for building enterprise-grade applications.`,
+          whyItMatters: `Improper cache configuration can result in users viewing stale data after a purchase or overwhelming origin databases with redundant queries. Atomic tag revalidation provides precision cache control.`,
+          syntax: `// Data Cache with Tags\nconst res = await fetch(url, { next: { tags: ['user-data'], revalidate: 3600 } });\n\n// Invalidation in Server Action\n'use server';\nrevalidateTag('user-data');`,
+          mainExample: {
+            title: "Cached Database Queries and Atomic Tag Invalidation",
+            language: "typescript",
+            code: `// lib/courses.ts & app/actions.ts
+import { unstable_cache } from "next/cache";
+import { revalidateTag } from "next/cache";
+
+// 1. Cached Database Query Function with Persistent Data Cache & Cache Tags
+export const getCachedCourses = unstable_cache(
+  async (category: string) => {
+    console.log("[DATABASE QUERY] Executing heavy SQL query for category:", category);
+    // Simulating database query
+    return [
+      { id: "c1", title: "Next.js 15 Deep Architecture", category },
+      { id: "c2", title: "Distributed Systems & Raft", category },
+    ];
+  },
+  ["courses-by-category-key"], // Unique cache key parts
+  {
+    tags: ["courses-cache-tag"], // Tag for on-demand atomic invalidation
+    revalidate: 86400, // 24-Hour TTL fallback
+  }
+);
+
+// 2. Server Action: Updates database and invalidates cache atomically
+export async function updateCourseTitleAction(courseId: string, newTitle: string) {
+  "use server";
+  
+  // Update database record...
+  console.log(\`Updating course \${courseId} to '\${newTitle}' in DB.\`);
+
+  // Purge only the specific cached tag across ALL global edge servers instantly!
+  revalidateTag("courses-cache-tag");
+  console.log("✅ Cache tag 'courses-cache-tag' successfully purged.");
+}`,
+            executable: false,
+            explanation: [
+              "unstable_cache wraps raw database calls (Postgres, Prisma, Drizzle) into the persistent Next.js Data Cache.",
+              "tags: ['courses-cache-tag'] assigns an identifier tag to the cached dataset.",
+              "revalidateTag('courses-cache-tag') purges the cached result globally on the next request without rebuilding unrelated routes.",
+            ],
+          },
+          detailedExplanation: [
+            "The 4 Caching Layers Explained: 1. Request Memoization deduplicates identical fetch calls within a single React render. 2. Data Cache persists data across server requests. 3. Full Route Cache stores pre-rendered HTML/RSC payloads on the server. 4. Router Cache stores RSC payloads in client browser memory during a user session.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Using `revalidatePath('/', 'layout')` for every update, which invalidates the entire website cache indiscriminately.",
+              badCode: "revalidatePath('/', 'layout'); // Flushes entire site cache",
+              goodCode: "revalidateTag('specific-product-tag'); // Surgical invalidation",
+              explanation: "Full-site path revalidation flushes all cached pages, causing origin database traffic spikes. Prefer granular cache tags.",
+            },
+          ],
+          bestPractices: [
+            "Use granular cache tags (`course-${id}`, `tenant-${orgId}`) for surgical invalidation.",
+            "Wrap raw database queries with `unstable_cache` to avoid duplicate database connection queries.",
+            "Trigger `revalidateTag` exclusively inside Server Actions or Route Handlers upon data mutations.",
+          ],
+          summary: [
+            "Next.js caching combines Request Memoization, Data Cache, Full Route Cache, and Router Cache.",
+            "`unstable_cache` caches arbitrary asynchronous database calls.",
+            "`revalidateTag` delivers zero-downtime, surgical on-demand cache purging.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-next-16",
+      slug: "edge-runtime-ai-streaming",
+      title: "Module 16: Edge Runtime & Real-Time AI Streaming (SSE)",
+      description: "Build low-latency generative AI applications using Next.js Edge Route Handlers, AI SDK streams, and Server-Sent Events (SSE).",
+      lessons: [
+        {
+          id: "next-ai-streaming",
+          slug: "nextjs-edge-runtime-ai-streaming-server-sent-events",
+          courseSlug: "nextjs",
+          moduleSlug: "edge-runtime-ai-streaming",
+          title: "Edge Runtime & Real-Time AI Streaming Pipelines",
+          description: "Build ultra-low-latency Generative AI streaming backends in Next.js using the Edge Runtime (`runtime = 'edge'`), ReadableStream pipelines, and Server-Sent Events (SSE).",
+          durationMinutes: 24,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "Configuring Edge Route Handlers with `export const runtime = 'edge'`",
+            "Streaming LLM token streams over Server-Sent Events (SSE) with `ReadableStream`",
+            "Handling client cancellation and backpressure when users abort AI generation",
+            "Consuming AI streaming endpoints in React client components with zero lag",
+          ],
+          introduction: `Large Language Models (LLMs) like Claude, Gemini, and GPT generate responses token-by-token over several seconds. Waiting for the complete text generation before returning an HTTP response results in terrible user experience. By deploying Next.js Route Handlers to the Edge Runtime with Streaming Server-Sent Events, tokens are streamed to the browser with near-zero latency.`,
+          whyItMatters: `The Edge Runtime starts in under 5ms (compared to 300ms+ cold starts for serverless Node.js containers), providing the fastest possible Time-To-First-Token (TTFT) for AI chat applications.`,
+          syntax: `export const runtime = 'edge';\n\nexport async function POST(req: Request) {\n  const stream = new ReadableStream({ ... });\n  return new Response(stream, { headers: { 'Content-Type': 'text/event-stream' } });\n}`,
+          mainExample: {
+            title: "Edge AI Streaming Route Handler with Server-Sent Events",
+            language: "typescript",
+            code: `// app/api/ai-chat/route.ts: Edge AI Streaming Pipeline
+import type { NextRequest } from "next/server";
+
+// 1. Force Edge Runtime for instant worldwide low-latency execution
+export const runtime = "edge";
+
+export async function POST(req: NextRequest) {
+  const { prompt } = await req.json();
+
+  // 2. Construct high-performance streaming response
+  const encoder = new TextEncoder();
+  const tokens = [
+    "Next.js ", "Edge ", "Runtime ", "delivers ", "blazing ", "fast ", 
+    "token ", "streaming ", "with ", "zero ", "cold ", "starts."
+  ];
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      for (const token of tokens) {
+        await new Promise((r) => setTimeout(r, 60)); // Simulating LLM inference tick
+        // Server-Sent Event formatted chunk
+        controller.enqueue(encoder.encode(\`data: \${JSON.stringify({ text: token })}\\n\\n\`));
+      }
+      controller.enqueue(encoder.encode("data: [DONE]\\n\\n"));
+      controller.close();
+    },
+  });
+
+  // 3. Return Streaming SSE Response
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+    },
+  });
+}`,
+            executable: false,
+            explanation: [
+              "runtime = 'edge' runs the route on globally distributed Edge nodes with sub-5ms cold starts.",
+              "ReadableStream streams chunks of text continuously as the LLM generates them.",
+              "Content-Type: text/event-stream formats output as a standard Server-Sent Event (SSE) stream compatible with modern UI clients.",
+            ],
+          },
+          detailedExplanation: [
+            "Edge Runtime Protocol: Edge routes run in a V8 sandbox without Node.js filesystem APIs (`fs`), which enables them to launch in milliseconds and stream infinite data without serverless execution timeout penalties.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Using Node.js specific libraries (e.g. `crypto`, `fs`) in Edge Runtime routes without polyfills.",
+              badCode: "import fs from 'fs'; // Crash in Edge Runtime",
+              goodCode: "const cryptoSubtle = globalThis.crypto.subtle; // Use Web Standard APIs",
+              explanation: "Edge Runtime supports only W3C Web Standard APIs (`fetch`, `Request`, `Response`, `TransformStream`, `SubtleCrypto`).",
+            },
+          ],
+          bestPractices: [
+            "Use `runtime = 'edge'` for high-concurrency, streaming AI endpoints.",
+            "Always include `Cache-Control: no-cache, no-transform` headers for real-time SSE streams.",
+            "Implement `req.signal.onabort` to cancel upstream LLM requests if the user closes the tab.",
+          ],
+          summary: [
+            "Edge Runtime delivers instant sub-5ms cold starts for AI streaming APIs.",
+            "`ReadableStream` streams LLM tokens to the user in real time.",
+            "Server-Sent Events provide reliable, lightweight streaming to React client hooks.",
+          ],
+        },
+      ],
+    },
   ],
 };

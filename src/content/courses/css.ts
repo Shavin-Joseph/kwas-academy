@@ -419,5 +419,500 @@ export const cssCourse: Course = {
         },
       ],
     },
+    {
+      id: "mod-css-12",
+      slug: "css-houdini-paint-api-typed-om",
+      title: "Module 12: CSS Houdini: Paint API, Typed OM & Worklets",
+      description: "Extend the browser's CSS rendering engine with CSS Houdini Paint Worklets, Typed OM, and `@property` custom property registration.",
+      lessons: [
+        {
+          id: "css-houdini-paint",
+          slug: "css-houdini-paint-api-typed-om-worklets",
+          courseSlug: "css",
+          moduleSlug: "css-houdini-paint-api-typed-om",
+          title: "CSS Houdini Paint API, Typed OM & Worklets",
+          description: "Hook directly into the browser's rasterization and styling pipelines with CSS Houdini: registering typed custom properties, writing paint worklets, and high-performance Typed OM.",
+          durationMinutes: 24,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "The architecture of CSS Houdini: Typed OM, Paint API, Layout API, and Animation Worklet",
+            "Registering typed custom properties using `@property` with syntax, inheritance, and initial values",
+            "Authoring a custom Canvas-like procedural background using `CSS.paintWorklet.addModule()`",
+            "Eliminating string parsing overhead using the CSS Typed Object Model (CSSOM)",
+          ],
+          introduction: `CSS Houdini is a collection of low-level browser APIs that expose the inner workings of the browser's CSS rendering engine. Rather than waiting years for browser vendors to adopt new CSS features, Houdini allows developers to write custom Paint Worklets and Typed Object Model routines that execute directly inside the browser's render pipeline.`,
+          whyItMatters: `Standard CSS custom properties cannot be smoothly animated when interpolating gradients or geometric shapes. Houdini's '@property' rule teaches the browser how to smoothly transition previously un-animatable properties at 60/120 FPS.`,
+          syntax: `@property --gradient-angle {\n  syntax: '<angle>';\n  inherits: false;\n  initial-value: 0deg;\n}\nbackground: paint(smooth-ripple);`,
+          mainExample: {
+            title: "Smooth Gradient Rotation with CSS Houdini @property",
+            language: "css",
+            code: `/* CSS Houdini Typed Property Registration */
+@property --glow-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@property --glow-opacity {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 0.8;
+}
+
+/* High-Performance Rotating Conic Glow */
+.houdini-glow-card {
+  --glow-angle: 0deg;
+  --glow-opacity: 0.8;
+  position: relative;
+  border-radius: 16px;
+  padding: 2px;
+  background: conic-gradient(
+    from var(--glow-angle),
+    #3b82f6,
+    #8b5cf6,
+    #ec4899,
+    #3b82f6
+  );
+  animation: rotateGlow 4s linear infinite;
+}
+
+.houdini-glow-card__inner {
+  background: #0f172a;
+  color: #ffffff;
+  padding: 24px;
+  border-radius: 14px;
+}
+
+/* Smooth GPU-interpolated angle transition */
+@keyframes rotateGlow {
+  to {
+    --glow-angle: 360deg;
+  }
+}`,
+            executable: true,
+            explanation: [
+              "@property --glow-angle registers the custom property with syntax '<angle>', enabling the browser's compositor to interpolate degrees smoothly.",
+              "conic-gradient smoothly rotates because the browser understands the mathematical transition from 0deg to 360deg.",
+              "CSS Typed OM replaces error-prone string parsing (like '16px') with typed objects (CSS.px(16)).",
+            ],
+          },
+          detailedExplanation: [
+            "Paint Worklet Lifecycle: A Paint Worklet executes in a lightweight separate thread without DOM access. The `paint(ctx, geom, properties)` function receives a 2D drawing context and container geometry, rendering custom procedural graphics directly onto the element's background box.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Attempting to animate an unregistered custom property without @property declaration.",
+              badCode: ".card { --angle: 0deg; transition: --angle 1s; }\n.card:hover { --angle: 180deg; }",
+              goodCode: "@property --angle { syntax: '<angle>'; inherits: false; initial-value: 0deg; }",
+              explanation: "Unregistered custom properties are treated as raw strings. The browser cannot interpolate between two arbitrary strings without an explicit typed syntax definition.",
+            },
+          ],
+          bestPractices: [
+            "Use `@property` to register typed CSS variables for smooth gradient and color transitions.",
+            "Use CSS Typed OM (`element.attributeStyleMap.set('opacity', 0.5)`) for high-speed JS style mutations.",
+            "Check for feature support using `CSS.registerProperty` or `@supports (background: paint(x))`.",
+          ],
+          summary: [
+            "CSS Houdini exposes low-level hooks into browser styling and rendering pipelines.",
+            "`@property` gives CSS variables types, inheritance rules, and smooth animation support.",
+            "Paint Worklets generate procedural background graphics directly on the GPU rasterizer.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-css-13",
+      slug: "view-transitions-api",
+      title: "Module 13: View Transitions API & Multi-Page Navigation Motion",
+      description: "Build seamless, native-like page transitions and morph animations across Single Page Apps and Multi-Page HTML navigations.",
+      lessons: [
+        {
+          id: "css-view-transitions",
+          slug: "view-transitions-api-spa-mpa-animations",
+          courseSlug: "css",
+          moduleSlug: "view-transitions-api",
+          title: "View Transitions API & Seamless DOM Morphing",
+          description: "Create fluid cross-fade, shared-element morphing, and native app transitions between DOM states using `document.startViewTransition()` and `@view-transition` CSS rules.",
+          durationMinutes: 24,
+          difficulty: "Intermediate",
+          whatYouWillLearn: [
+            "The architecture of the View Transitions API: Old Snapshot vs New Snapshot pseudo-element tree",
+            "Triggering DOM state transitions using `document.startViewTransition()`",
+            "Shared element transitions using `view-transition-name: item-hero`",
+            "Multi-Page Application (MPA) cross-document transitions using `@view-transition { navigation: auto; }`",
+          ],
+          introduction: `Historically, animating state transitions between different views or pages required complex JavaScript libraries (Framer Motion, FLIP calculations) that manually measured bounding boxes. The View Transitions API enables native, hardware-accelerated animations between DOM states with just a few lines of CSS.`,
+          whyItMatters: `Seamless view transitions bridge the UX gap between web pages and native mobile applications. Users perceive morphing cards and persistent headers as instantaneous and fluid.`,
+          syntax: `::view-transition-old(root),\n::view-transition-new(root) {\n  animation-duration: 300ms;\n}\n.hero-card { view-transition-name: selected-card; }`,
+          mainExample: {
+            title: "Shared Element Morphing with View Transitions",
+            language: "css",
+            code: `/* View Transitions Global Configuration */
+@view-transition {
+  navigation: auto; /* Enables seamless cross-document multi-page transitions */
+}
+
+/* Custom Morphing Element */
+.course-card-thumbnail {
+  view-transition-name: active-course-thumbnail;
+  contain: layout;
+}
+
+.course-detail-header-image {
+  view-transition-name: active-course-thumbnail;
+}
+
+/* Custom Cross-Fade & Scale Animation */
+::view-transition-old(root) {
+  animation: 250ms ease-out both fadeOut;
+}
+
+::view-transition-new(root) {
+  animation: 250ms ease-in both fadeIn;
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.98); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(1.02); }
+  to { opacity: 1; transform: scale(1); }
+}`,
+            executable: true,
+            explanation: [
+              "@view-transition { navigation: auto; } enables native cross-page animations for standard multi-page MPA navigation.",
+              "view-transition-name: active-course-thumbnail pairs the thumbnail on the catalog page with the header on the lesson page, automatically morphing size and position.",
+              "::view-transition-old and ::view-transition-new control the cross-fade animation between incoming and outgoing snapshots.",
+            ],
+          },
+          detailedExplanation: [
+            "Pseudo-Element Snapshot Tree: When a transition begins, the browser creates a top-level `::view-transition` pseudo-element containing `::view-transition-group(name)`, which holds `::view-transition-image-pair(name)` with the old and new captured raster snapshots.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Assigning the same view-transition-name to multiple elements simultaneously on the same page.",
+              badCode: ".card { view-transition-name: card-item; } /* Error: duplicate name */",
+              goodCode: ".card.is-active { view-transition-name: active-card; }",
+              explanation: "view-transition-name must be unique across the current DOM. If two visible elements share the same name, the transition will abort.",
+            },
+          ],
+          bestPractices: [
+            "Dynamically assign `view-transition-name` in JavaScript to only the clicked element right before transitioning.",
+            "Respect user motion preferences with `@media (prefers-reduced-motion: reduce)` to disable transitions.",
+            "Use `contain: layout` on morphing elements to optimize snapshot bounding box calculations.",
+          ],
+          summary: [
+            "View Transitions API creates native app-quality view morphing with minimal CSS.",
+            "`view-transition-name` links shared elements across different DOM states.",
+            "Pseudo-elements (`::view-transition-new`) allow full keyframe animation customization.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-css-14",
+      slug: "subgrid-anchor-positioning",
+      title: "Module 14: Subgrid, Anchor Positioning API & Advanced Multi-Axis Layout",
+      description: "Master CSS Subgrid for nested grid alignment and the CSS Anchor Positioning API for tooltips and floating popovers.",
+      lessons: [
+        {
+          id: "css-subgrid-anchors",
+          slug: "subgrid-anchor-positioning-api",
+          courseSlug: "css",
+          moduleSlug: "subgrid-anchor-positioning",
+          title: "CSS Subgrid & Anchor Positioning API",
+          description: "Eliminate floating layout bugs using CSS Subgrid for nested alignment and the modern CSS Anchor Positioning API (`anchor()`, `position-anchor`) for tethered tooltips and popovers.",
+          durationMinutes: 24,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "How `grid-template-rows: subgrid` allows nested children to participate in parent track sizing",
+            "Tethering floating dialogs, menus, and tooltips using `position-anchor: --my-anchor`",
+            "Calculating dynamic offsets with the `anchor()` function (e.g. `top: anchor(bottom)`)",
+            "Automatic collision detection and positioning fallbacks with `@position-try`",
+          ],
+          introduction: `Historically, nested card components inside CSS Grid could not align their internal headers and footers with neighboring cards because each child established an independent layout context. CSS Subgrid solves this by letting nested elements snap directly to parent tracks. Additionally, the new CSS Anchor Positioning API eliminates third-party libraries (like Popper.js or Floating UI) by tethering floating popovers to anchor elements purely in CSS.`,
+          whyItMatters: `Misaligned card buttons and overflowing dropdown menus have plagued web design for decades. Subgrid and Anchor Positioning deliver pixel-perfect cross-component alignment with zero JavaScript overhead.`,
+          syntax: `grid-template-rows: subgrid;\nposition: absolute;\nposition-anchor: --menu-btn;\ntop: anchor(bottom);\nleft: anchor(left);`,
+          mainExample: {
+            title: "Subgrid Alignment and Anchor Positioning Tooltip",
+            language: "css",
+            code: `/* 1. CSS Subgrid Card Grid Layout */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-auto-rows: auto 1fr auto; /* Row 1: Header, Row 2: Body, Row 3: Actions */
+  gap: 24px;
+}
+
+.card-item {
+  display: grid;
+  grid-row: span 3; /* Spans 3 parent rows */
+  grid-template-rows: subgrid; /* Snaps internal elements to parent rows! */
+  padding: 20px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+}
+
+/* 2. Anchor Positioning API: Tooltip Tethered to Anchor Button */
+.anchor-trigger-btn {
+  anchor-name: --docs-info-btn;
+}
+
+.tethered-tooltip {
+  position: absolute;
+  position-anchor: --docs-info-btn;
+  top: anchor(bottom);
+  left: anchor(center);
+  transform: translateX(-50%) translateY(8px);
+  padding: 8px 14px;
+  border-radius: 6px;
+  background: #0f172a;
+  color: #f8fafc;
+  font-size: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  position-try-fallbacks: --flip-above;
+}
+
+@position-try --flip-above {
+  bottom: anchor(top);
+  top: unset;
+}`,
+            executable: true,
+            explanation: [
+              "grid-row: span 3 + grid-template-rows: subgrid allows card titles, descriptions, and action buttons to align horizontally across all columns regardless of text length.",
+              "anchor-name: --docs-info-btn registers the button as a named anchor target.",
+              "position-anchor and anchor(bottom) bind the tooltip's top coordinate directly to the bottom edge of the button in pure CSS.",
+              "@position-try --flip-above flips the tooltip above the button automatically if it overflows the viewport.",
+            ],
+          },
+          detailedExplanation: [
+            "Collision Detection with `@position-try`: When using `position-try-fallbacks`, the browser calculates if the popover overflows the viewport. If overflow occurs, the browser automatically applies the fallback rule (e.g. flipping top/bottom or aligning to right) without JavaScript window resize listeners.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Forgetting to specify `grid-row: span N` when activating `grid-template-rows: subgrid` on a child element.",
+              badCode: ".child { grid-template-rows: subgrid; }",
+              goodCode: ".child { grid-row: span 3; grid-template-rows: subgrid; }",
+              explanation: "Subgrid requires knowing how many parent tracks the subgrid child spans.",
+            },
+          ],
+          bestPractices: [
+            "Use Subgrid for multi-card catalogs to ensure uniform title heights and bottom-aligned action buttons.",
+            "Use CSS Anchor Positioning for tooltips, custom select menus, and floating popovers.",
+            "Always include `@position-try` fallbacks to handle edge-of-screen viewport boundaries.",
+          ],
+          summary: [
+            "Subgrid aligns nested elements to parent grid tracks across sibling components.",
+            "Anchor Positioning binds floating elements to target anchors in pure CSS.",
+            "`@position-try` provides automated, zero-JS viewport collision resolution.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-css-15",
+      slug: "scroll-driven-animations",
+      title: "Module 15: Scroll-Driven Animations & Composite Layer Tuning",
+      description: "Master CSS scroll-driven animations (`animation-timeline: scroll()`), view timelines, and 120 FPS GPU composite layer optimization.",
+      lessons: [
+        {
+          id: "css-scroll-animations",
+          slug: "css-scroll-driven-animations-view-timelines-gpu",
+          courseSlug: "css",
+          moduleSlug: "scroll-driven-animations",
+          title: "Scroll-Driven Animations & GPU Composite Performance",
+          description: "Build scroll-linked progress bars, parallax effects, and element reveal animations in pure CSS using `animation-timeline: scroll()` and `view()`, optimized for 120 FPS GPU compositing.",
+          durationMinutes: 24,
+          difficulty: "Intermediate",
+          whatYouWillLearn: [
+            "The architecture of CSS Scroll-Driven Animations: Scroll Progress Timelines vs View Progress Timelines",
+            "Building page reading progress indicators using `animation-timeline: scroll()`",
+            "Revealing and animating elements as they enter the viewport using `animation-timeline: view()`",
+            "GPU composite layer optimization: `will-change`, transform, and opacity rendering pipelines",
+          ],
+          introduction: `Traditionally, creating scroll-linked animations required attaching JavaScript 'window.addEventListener("scroll", ...)' handlers that triggered frequent DOM layout recalculations, causing frame drops and battery drain. Modern CSS Scroll-Driven Animations link keyframe animations directly to the scroll offset on the compositor thread with zero JavaScript execution.`,
+          whyItMatters: `Scroll animations executed on the browser's GPU compositor thread run at butter-smooth 120 FPS even when the JavaScript main thread is completely busy executing complex calculations.`,
+          syntax: `animation: growProgressBar linear;\nanimation-timeline: scroll(root block);\nanimation-range: entry 0% exit 100%;`,
+          mainExample: {
+            title: "Pure CSS Reading Progress Bar and Scroll-Reveal Cards",
+            language: "css",
+            code: `/* 1. Global Reading Progress Indicator (Pure CSS) */
+.reading-progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 4px;
+  width: 100%;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899);
+  transform-origin: left;
+  transform: scaleX(0);
+  animation: expandProgressBar linear both;
+  animation-timeline: scroll(root block);
+  z-index: 9999;
+}
+
+@keyframes expandProgressBar {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* 2. Scroll-Reveal Cards using View Progress Timeline */
+.scroll-reveal-card {
+  opacity: 0;
+  transform: translateY(40px) scale(0.95);
+  animation: revealOnScroll ease-out both;
+  animation-timeline: view();
+  animation-range: entry 10% cover 30%;
+  will-change: transform, opacity;
+}
+
+@keyframes revealOnScroll {
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}`,
+            executable: true,
+            explanation: [
+              "animation-timeline: scroll(root block) binds the progress bar animation progress (0% to 100%) to the page's vertical scroll distance.",
+              "animation-timeline: view() links the animation progress to the exact moment the card enters and traverses the viewport.",
+              "animation-range: entry 10% cover 30% specifies the exact scroll window when the reveal animation begins and completes.",
+              "will-change: transform, opacity promotes the element to a dedicated GPU compositing layer, preventing layout repaints.",
+            ],
+          },
+          detailedExplanation: [
+            "Pixel Pipeline (Layout vs Paint vs Composite): Animations modifying `top`, `left`, `width`, or `height` force the browser to trigger expensive Layout recalculations. Animations modifying `transform` and `opacity` bypass Layout and Paint entirely, executing directly on the GPU Compositor thread.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Animating layout properties like 'width' for progress bars instead of GPU-accelerated 'transform: scaleX()'.",
+              badCode: "@keyframes expand { from { width: 0%; } to { width: 100%; } }",
+              goodCode: "@keyframes expand { from { transform: scaleX(0); } to { transform: scaleX(1); } }",
+              explanation: "Animating 'width' forces CPU layout reflows on every frame. Animating 'transform: scaleX()' is executed entirely on the GPU compositor.",
+            },
+          ],
+          bestPractices: [
+            "Animate only `transform` and `opacity` for smooth 120 FPS performance.",
+            "Use `animation-range: entry` and `exit` to fine-tune when elements trigger as they scroll into view.",
+            "Promote performance-critical animated cards with `will-change: transform, opacity`.",
+          ],
+          summary: [
+            "CSS Scroll-Driven Animations run directly on the compositor thread with zero JS overhead.",
+            "`scroll()` tracks container scroll distance; `view()` tracks element visibility in the viewport.",
+            "Stick to `transform` and `opacity` to maintain 120 FPS GPU hardware acceleration.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-css-16",
+      slug: "container-queries-style-queries",
+      title: "Module 16: Container Queries, Style Queries & Micro-Component Architecture",
+      description: "Build truly responsive micro-components that adapt based on parent container width (`@container`) and computed styles.",
+      lessons: [
+        {
+          id: "css-container-queries",
+          slug: "container-queries-container-style-queries",
+          courseSlug: "css",
+          moduleSlug: "container-queries-style-queries",
+          title: "Container Queries, Style Queries & Component Responsiveness",
+          description: "Move beyond global viewport media queries using CSS Container Queries (`@container (min-width: ...)`), container style queries, and container query length units (cqw, cqh).",
+          durationMinutes: 24,
+          difficulty: "Intermediate",
+          whatYouWillLearn: [
+            "Why Media Queries (`@media`) fail in modular component-driven design systems",
+            "Declaring containment contexts with `container-type: inline-size`",
+            "Writing modular layout rules with `@container (min-width: 400px)`",
+            "Using Container Query Length Units (`cqw`, `cqh`, `cqi`, `cqb`) for proportional typography",
+          ],
+          introduction: `For over a decade, Responsive Web Design relied exclusively on Viewport Media Queries (@media (min-width: 768px)). However, modern web applications are built from modular components placed inside sidebars, modal dialogs, and dynamic grid cards. CSS Container Queries allow components to adapt their layout based on the size of their parent container rather than the global screen width.`,
+          whyItMatters: `A product card placed in a narrow 300px sidebar should render vertically, while the exact same product card placed in an 800px main content area should render horizontally. Container queries make components truly autonomous and reusable anywhere.`,
+          syntax: `container-type: inline-size;\ncontainer-name: card-wrapper;\n@container (min-width: 450px) {\n  .card-inner { flex-direction: row; }\n}`,
+          mainExample: {
+            title: "Adaptive Autonomous Card with CSS Container Queries",
+            language: "css",
+            code: `/* 1. Define Container Parent Context */
+.component-slot {
+  container-type: inline-size;
+  container-name: component-wrapper;
+}
+
+/* 2. Base (Default) Vertical Mobile-First Card */
+.adaptive-product-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+}
+
+.adaptive-product-card__image {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.adaptive-product-card__title {
+  /* Fluid typography proportional to container width! */
+  font-size: clamp(1rem, 4cqi, 1.5rem);
+  font-weight: 700;
+  color: #0f172a;
+}
+
+/* 3. Container Query: Triggers when parent container width exceeds 500px */
+@container component-wrapper (min-width: 500px) {
+  .adaptive-product-card {
+    flex-direction: row;
+    align-items: center;
+    padding: 24px;
+  }
+
+  .adaptive-product-card__image {
+    width: 180px;
+    aspect-ratio: 1 / 1;
+  }
+
+  .adaptive-product-card__content {
+    flex: 1;
+  }
+}`,
+            executable: true,
+            explanation: [
+              "container-type: inline-size establishes a containment context measuring the parent's horizontal width.",
+              "@container component-wrapper (min-width: 500px) modifies card layout only when its parent slot has 500px or more available.",
+              "4cqi represents 4% of the container's inline width, enabling fluid scaling typography.",
+            ],
+          },
+          detailedExplanation: [
+            "Container Style Queries: Modern CSS also supports `@container style(--theme: dark)` and `@container style(color: red)`. This allows components to adapt their internal child styles based on computed custom properties of the parent container.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Applying @container rules directly to the element that defines container-type.",
+              badCode: ".card { container-type: inline-size; }\n@container (min-width: 400px) { .card { background: red; } }",
+              goodCode: ".card-wrapper { container-type: inline-size; }\n@container (min-width: 400px) { .card { background: red; } }",
+              explanation: "An element cannot query its own container size (to avoid infinite layout loops). Container queries must query ancestor containers.",
+            },
+          ],
+          bestPractices: [
+            "Default to `container-type: inline-size` for responsive component slots.",
+            "Use container query units (`cqi`) for proportional padding and fluid typography.",
+            "Combine container queries with CSS Grid for flexible design system layouts.",
+          ],
+          summary: [
+            "Container Queries allow components to adapt to their parent container dimensions.",
+            "`container-type: inline-size` establishes width containment contexts.",
+            "Enables truly modular, autonomous design systems that render cleanly in sidebars, modals, or main grids.",
+          ],
+        },
+      ],
+    },
   ],
 };

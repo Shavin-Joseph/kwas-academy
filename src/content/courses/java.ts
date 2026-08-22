@@ -417,5 +417,481 @@ export const javaCourse: Course = {
         },
       ],
     },
+    {
+      id: "mod-java-12",
+      slug: "jvm-zgc-shenandoah-gc-internals",
+      title: "Module 12: JVM Memory: ZGC, Shenandoah & Ultra-Low-Latency GC",
+      description: "Master JVM memory management: Generational ZGC, Shenandoah colored pointers, load barriers, and sub-millisecond GC pauses.",
+      lessons: [
+        {
+          id: "java-zgc-gc",
+          slug: "jvm-memory-management-generational-zgc-shenandoah",
+          courseSlug: "java",
+          moduleSlug: "jvm-zgc-shenandoah-gc-internals",
+          title: "JVM Garbage Collection: Generational ZGC & Shenandoah",
+          description: "Master the internal architecture of the Java Virtual Machine memory management: Generational ZGC (Z Garbage Collector), colored 64-bit pointers, JIT read load barriers, and achieving sub-millisecond GC pause times on multi-terabyte heaps.",
+          durationMinutes: 26,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "The evolution from G1GC Stop-The-World pauses to concurrent ZGC and Shenandoah",
+            "How 64-bit Reference Colored Pointers (Marked0, Marked1, Remapped) track object status without header lookups",
+            "JIT Load Barriers: healing pointers concurrently during active application thread execution",
+            "Tuning Generational ZGC (`-XX:+UseZGC -XX:+ZGenerational`) for high-throughput trading and gaming engines",
+          ],
+          introduction: `Historically, Java applications with large memory heaps (100GB+) suffered from 'Stop-The-World' (STW) garbage collection pauses lasting hundreds of milliseconds or several seconds. Modern Java (JDK 21+) features Generational ZGC and Shenandoah, which perform object marking, relocation, and pointer remapping concurrently with running application threads, guaranteeing GC pause times below 1 millisecond regardless of heap size.`,
+          whyItMatters: `In high-frequency trading (HFT), multiplayer gaming servers, and real-time payment gateways, a 50ms GC pause can cause missed transactions or disconnected players. Generational ZGC eliminates latency spikes entirely.`,
+          syntax: `java -XX:+UseZGC -XX:+ZGenerational -Xmx32g -jar app.jar`,
+          mainExample: {
+            title: "Simulating ZGC Memory Allocation and Inspecting JVM GC Metrics",
+            language: "java",
+            code: `// JVM Garbage Collector & Memory Telemetry Inspection
+import java.lang.management.GarbageCollectorMXBean;
+import java.lang.management.ManagementFactory;
+import java.util.List;
+
+public class ZgcDiagnosticMonitor {
+    public static void main(String[] args) {
+        System.out.println("=== JVM Memory & GC Engine Diagnostics ===");
+
+        // 1. Inspect active JVM Garbage Collector MXBeans
+        List<GarbageCollectorMXBean> gcBeans = ManagementFactory.getGarbageCollectorMXBeans();
+        for (GarbageCollectorMXBean gc : gcBeans) {
+            System.out.printf("Active GC Engine: %s | Total Collections: %d | Total Pause Time: %d ms%n",
+                gc.getName(), gc.getCollectionCount(), gc.getCollectionTime());
+        }
+
+        // 2. High-Frequency Heap Allocation Simulation
+        long start = System.nanoTime();
+        for (int i = 0; i < 500_000; i++) {
+            // Ephemeral Young Generation allocations
+            byte[] transientBuffer = new byte[1024]; // 1KB per allocation
+            if (i % 100_000 == 0) {
+                long elapsedMs = (System.nanoTime() - start) / 1_000_000;
+                System.out.printf("Allocated %d items (Concurrent Phase Active at %d ms)%n", i, elapsedMs);
+            }
+        }
+
+        System.out.println("✅ Generational ZGC completed with zero Stop-The-World UI freezes!");
+    }
+}`,
+            executable: true,
+            explanation: [
+              "ManagementFactory.getGarbageCollectorMXBeans() queries active GC telemetry from the JVM runtime.",
+              "ZGC uses colored pointers where reference bits store metadata (Marked0, Marked1, Remapped) directly in the 64-bit memory address.",
+              "When an application thread dereferences a relocated object, a JIT Load Barrier intercepts the read, updates the pointer in-place ('self-healing'), and returns the object in nanoseconds.",
+            ],
+          },
+          detailedExplanation: [
+            "Generational ZGC (JDK 21+): Separates memory into Young and Old generations. Because most allocated objects die young, Generational ZGC collects the young generation more frequently, drastically increasing allocation throughput while retaining sub-millisecond pause guarantees.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Allocating memory faster than ZGC can concurrently reclaim it, causing 'Allocation Stalls'.",
+              badCode: "while(true) { list.add(new byte[10_000_000]); } // Unbounded memory exhaustion",
+              goodCode: "// Size heap adequately with -Xmx and tune -XX:ZAllocationSpikeTolerance",
+              explanation: "If allocation rate exceeds concurrent GC speed, threads stall waiting for memory. Increase heap size or tune allocation spike tolerance.",
+            },
+          ],
+          bestPractices: [
+            "Use `-XX:+UseZGC -XX:+ZGenerational` on JDK 21+ for ultra-low latency.",
+            "Avoid calling `System.gc()` manually in production code.",
+            "Monitor GC pauses in production using JDK Flight Recorder (JFR) and Unified JVM GC Logging (`-Xlog:gc*`).",
+          ],
+          summary: [
+            "Generational ZGC guarantees sub-millisecond pause times on heaps up to 16TB.",
+            "Colored pointers and JIT load barriers perform compaction concurrently with application threads.",
+            "Eliminates Stop-The-World latency spikes in enterprise Java microservices.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-java-13",
+      slug: "project-loom-virtual-threads-carriers",
+      title: "Module 13: Project Loom: Virtual Threads & Carrier Pool Internals",
+      description: "Master Java 21+ Project Loom: millions of Virtual Threads, continuation frames, unpinning carrier threads, and Structured Concurrency.",
+      lessons: [
+        {
+          id: "java-virtual-threads",
+          slug: "project-loom-virtual-threads-continuations-structured-concurrency",
+          courseSlug: "java",
+          moduleSlug: "project-loom-virtual-threads-carriers",
+          title: "Project Loom: Virtual Threads & Continuation Mechanics",
+          description: "Scale Java web servers to millions of concurrent requests with Project Loom: Virtual Threads (Java 21+), JVM continuation stack frames, ForkJoinPool carrier thread mounting/unmounting, avoiding thread pinning, and Structured Concurrency (`StructuredTaskScope`).",
+          durationMinutes: 24,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "Platform Threads (1:1 OS mapping, 1MB stack) vs Virtual Threads (M:N JVM mapping, few hundred bytes)",
+            "How the JVM mounts and unmounts Virtual Threads onto Carrier Threads (`ForkJoinPool`) during blocking I/O",
+            "Diagnosing Thread Pinning (`synchronized` blocks vs `ReentrantLock`)",
+            "Structured Concurrency with `StructuredTaskScope.ShutdownOnFailure`",
+          ],
+          introduction: `Prior to Java 21, Java threads were 1:1 wrappers around heavyweight OS kernel threads. A single JVM could only handle ~5,000 concurrent threads before exhausting OS memory limits (each OS thread consumes 1MB of stack). Project Loom introduces Virtual Threads: lightweight user-mode threads managed entirely by the JVM that consume only ~200 bytes of heap memory, allowing a single JVM to easily host 1,000,000+ concurrent threads.`,
+          whyItMatters: `Virtual Threads eliminate the need for complex reactive programming (RxJava, Project Reactor, WebFlux). Developers can write simple synchronous blocking code that scales with the performance of asynchronous event loops.`,
+          syntax: `try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {\n  executor.submit(() -> fetchHttp());\n}`,
+          mainExample: {
+            title: "Spawning 100,000 Virtual Threads and Structured Concurrency",
+            language: "java",
+            code: `// Java 21+ Project Loom: Virtual Threads & Structured Concurrency
+import java.util.concurrent.Executors;
+import java.util.concurrent.StructuredTaskScope;
+import java.time.Duration;
+
+public class LoomVirtualThreadsDemo {
+    public static void main(String[] args) throws Exception {
+        System.out.println("=== Project Loom: Virtual Threads Concurrency Engine ===");
+
+        // 1. Execute 100,000 Concurrent Virtual Threads
+        long startTime = System.currentTimeMillis();
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            for (int i = 1; i <= 100_000; i++) {
+                final int taskId = i;
+                executor.submit(() -> {
+                    // Simulate non-blocking I/O sleep (Unmounts virtual thread from carrier thread!)
+                    Thread.sleep(Duration.ofMillis(50));
+                    if (taskId == 100_000) {
+                        System.out.println("✅ All 100,000 Virtual Threads dispatched and unmounted cleanly!");
+                    }
+                    return taskId;
+                });
+            }
+        } // Auto-closes and waits for all 100,000 tasks to finish
+        System.out.printf("100,000 Virtual Threads finished in: %d ms%n", (System.currentTimeMillis() - startTime));
+
+        // 2. Structured Concurrency Scope (Java 21 Preview / Modern Pattern)
+        // Spawns subtasks where a failure in one subtask cancels the other automatically!
+        try (var scope = new StructuredTaskScope.ShutdownOnFailure()) {
+            var userTask = scope.fork(() -> queryUserService());
+            var billingTask = scope.fork(() -> queryBillingService());
+
+            scope.join();           // Join both forks
+            scope.throwIfFailed();  // Propagate errors if any failed
+
+            System.out.printf("Structured Results -> User: %s | Billing: %s%n",
+                userTask.get(), billingTask.get());
+        }
+    }
+
+    private static String queryUserService() throws InterruptedException {
+        Thread.sleep(30);
+        return "User(Alex, Pro)";
+    }
+
+    private static String queryBillingService() throws InterruptedException {
+        Thread.sleep(40);
+        return "Invoice(Paid, $199)";
+    }
+}`,
+            executable: true,
+            explanation: [
+              "Executors.newVirtualThreadPerTaskExecutor() spawns a new virtual thread for every submitted task.",
+              "When a virtual thread executes Thread.sleep() or blocking socket reads, the JVM unmounts its continuation stack from the carrier OS thread, allowing another virtual thread to execute on that carrier thread.",
+              "StructuredTaskScope guarantees that if one subtask fails, all running subtasks in the scope are automatically cancelled.",
+            ],
+          },
+          detailedExplanation: [
+            "Thread Pinning Warning: When a virtual thread enters a `synchronized` block or executes native JNI methods, it becomes 'pinned' to its carrier OS thread, preventing the carrier from servicing other virtual threads during blocking I/O. Replace `synchronized` with `java.util.concurrent.locks.ReentrantLock`.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Pooling virtual threads using a fixed thread pool (`Executors.newFixedThreadPool`).",
+              badCode: "ExecutorService pool = Executors.newFixedThreadPool(100, Thread.ofVirtual().factory());",
+              goodCode: "ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor();",
+              explanation: "Virtual threads should never be pooled. They are ephemeral, lightweight, and meant to be created on-demand per request.",
+            },
+          ],
+          bestPractices: [
+            "Use `Executors.newVirtualThreadPerTaskExecutor()` in Tomcat/Jetty web servers.",
+            "Replace legacy `synchronized` keyword with `ReentrantLock` to prevent thread pinning.",
+            "Adopt `StructuredTaskScope` to eliminate dangling background threads.",
+          ],
+          summary: [
+            "Virtual Threads bring lightweight user-mode threading to Java without reactive complexity.",
+            "Blocking I/O unmounts continuation frames from underlying OS carrier threads.",
+            "Structured Concurrency guarantees atomic task lifecycle management and error propagation.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-java-14",
+      slug: "project-panama-foreign-function-memory",
+      title: "Module 14: Project Panama: Foreign Function & Memory API (FFM)",
+      description: "Replace legacy JNI with Project Panama's type-safe Foreign Function and Memory (FFM) API for direct C/C++ interop.",
+      lessons: [
+        {
+          id: "java-panama-ffm",
+          slug: "project-panama-foreign-function-memory-api-jni-replacement",
+          courseSlug: "java",
+          moduleSlug: "project-panama-foreign-function-memory",
+          title: "Project Panama: Foreign Function & Memory (FFM) API",
+          description: "Eliminate legacy Java Native Interface (JNI) boilerplate using Project Panama (Java 22+): type-safe off-heap native memory allocation with `Arena` and `MemorySegment`, and invoking native C shared libraries with `Linker` and `SymbolLookup`.",
+          durationMinutes: 26,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "Why legacy JNI was slow, unsafe, and required writing intermediate C stub wrappers",
+            "Allocating and managing deterministic off-heap memory with `Arena` and `MemorySegment`",
+            "Looking up and calling native C standard library functions (e.g. `strlen`, `printf`, `posix_memalign`) via `Linker.nativeLinker()`",
+            "Zero-copy interop with native AI/ML libraries (ONNX, llama.cpp, BLAS)",
+          ],
+          introduction: `For 25 years, connecting Java to native C/C++ libraries required Java Native Interface (JNI), which was notoriously slow, complex, and prone to JVM crashes. Project Panama's Foreign Function & Memory (FFM) API (finalized in Java 22) provides a pure Java API to allocate off-heap native memory safely and call foreign native C functions with zero C wrapper code and near-zero invocation overhead.`,
+          whyItMatters: `High-performance computing (HPC), GPU tensor computation, and low-latency database engines allocate memory off-heap outside the JVM GC. FFM provides deterministic deallocation with compile-time memory segment boundaries.`,
+          syntax: `try (Arena arena = Arena.ofConfined()) {\n  MemorySegment segment = arena.allocate(1024);\n  Linker linker = Linker.nativeLinker();\n}`,
+          mainExample: {
+            title: "Invoking Native C strlen and Allocating Off-Heap Memory with Project Panama",
+            language: "java",
+            code: `// Java 22+ Project Panama Foreign Function & Memory (FFM) Architecture
+import java.lang.foreign.*;
+import java.lang.invoke.MethodHandle;
+
+public class PanamaNativeDemo {
+    public static void main(String[] args) throws Throwable {
+        System.out.println("=== Project Panama: Foreign Function & Memory API ===");
+
+        // 1. Allocate deterministic off-heap memory using a Confined Arena
+        try (Arena arena = Arena.ofConfined()) {
+            String message = "KWAS Academy Systems Engineering 2026";
+            
+            // Allocate native UTF-8 C string off-heap (outside the JVM GC!)
+            MemorySegment nativeString = arena.allocateFrom(message);
+            System.out.printf("Off-Heap Memory Address: 0x%X (Byte Size: %d)%n",
+                nativeString.address(), nativeString.byteSize());
+
+            // 2. Lookup standard C library 'strlen' function using Native Linker
+            Linker linker = Linker.nativeLinker();
+            SymbolLookup stdlib = linker.defaultLookup();
+            MemorySegment strlenAddress = stdlib.find("strlen").orElseThrow();
+
+            // Create strongly-typed FunctionDescriptor: returns long (size_t), takes address pointer
+            FunctionDescriptor descriptor = FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS);
+            MethodHandle strlenHandle = linker.downcallHandle(strlenAddress, descriptor);
+
+            // 3. Invoke native C function directly from Java!
+            long length = (long) strlenHandle.invokeExact(nativeString);
+            System.out.printf("✅ Invoked native C 'strlen()' -> Computed Length: %d characters%n", length);
+        } // Arena closes here: Off-heap memory is DEALLOCATED instantly without waiting for GC!
+
+        System.out.println("Off-heap memory freed deterministically.");
+    }
+}`,
+            executable: true,
+            explanation: [
+              "Arena.ofConfined() creates a bounded memory lifetime scope tied to the try-with-resources block.",
+              "arena.allocateFrom() allocates raw memory outside the JVM heap that will not be touched by the Garbage Collector.",
+              "Linker.nativeLinker() links native C library functions into high-performance JVM MethodHandles.",
+              "Zero C/C++ stub files, JNI headers, or gcc build steps were needed!",
+            ],
+          },
+          detailedExplanation: [
+            "Arena Lifecycles: 1. `Arena.ofConfined()` bound to a single thread (fastest). 2. `Arena.ofShared()` thread-safe, accessible across multiple concurrent threads. 3. `Arena.global()` lives for the entire JVM lifetime.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Accessing a `MemorySegment` after its parent `Arena` has closed, causing a `IllegalStateException`.",
+              badCode: "MemorySegment seg; try(var a = Arena.ofConfined()) { seg = a.allocate(100); } seg.get(JAVA_INT, 0);",
+              goodCode: "// Keep MemorySegment usage strictly within the active Arena try-with-resources block",
+              explanation: "Panama prevents Use-After-Free security bugs by throwing a safe Java exception if closed memory is accessed.",
+            },
+          ],
+          bestPractices: [
+            "Use Panama FFM instead of JNI for all new native C/Rust library integrations.",
+            "Prefer `Arena.ofConfined()` for maximum allocation throughput on single-threaded workers.",
+            "Use Panama's `jextract` tool to generate Java bindings automatically from C header files (`.h`).",
+          ],
+          summary: [
+            "Project Panama replaces JNI with a safe, pure Java native interop API.",
+            "`Arena` and `MemorySegment` manage off-heap memory with deterministic lifetimes.",
+            "`Linker` calls native C/Rust functions directly with near-zero overhead.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-java-15",
+      slug: "bytecode-engineering-asm-bytebuddy",
+      title: "Module 15: Bytecode Engineering with ASM, ByteBuddy & ClassLoaders",
+      description: "Manipulate JVM bytecode dynamically: Java Agent instrumentation, ASM visitor pipelines, and custom ClassLoaders.",
+      lessons: [
+        {
+          id: "java-bytecode-asm",
+          slug: "java-bytecode-engineering-asm-bytebuddy-agents",
+          courseSlug: "java",
+          moduleSlug: "bytecode-engineering-asm-bytebuddy",
+          title: "JVM Bytecode Engineering: ASM & ByteBuddy Instrumentation",
+          description: "Inspect and rewrite compiled JVM bytecode at runtime: Java ClassFile binary structure, ClassLoaders delegation hierarchy, Java Agents (`premain` / `Instrumentation`), and bytecode synthesis with ByteBuddy and ASM.",
+          durationMinutes: 26,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "The anatomy of a JVM `.class` binary: Magic Number (`0xCAFEBABE`), Constant Pool, FieldInfo, and Code attributes",
+            "JVM ClassLoader delegation hierarchy: Bootstrap, Platform, and System/Application ClassLoaders",
+            "Writing Java Agents with `java.lang.instrument.Instrumentation` for runtime bytecode modification",
+            "Injecting automatic performance profiling and AOP aspects dynamically using ByteBuddy",
+          ],
+          introduction: `The JVM does not execute Java source code; it executes compiled JVM bytecode instructions (like \`aload_0\`, \`invokevirtual\`, \`iadd\`). Modern APM profilers (Datadog, Dynatrace, New Relic) and frameworks (Spring AOP, Hibernate) use Bytecode Engineering to dynamically inspect and rewrite classes as they are loaded into RAM by the ClassLoader.`,
+          whyItMatters: `Bytecode manipulation allows you to inject distributed tracing, performance metrics, and security audits into third-party libraries without having access to their original source code.`,
+          syntax: `// Java Agent Entry Point\npublic static void premain(String agentArgs, Instrumentation inst) {\n  inst.addTransformer(new CustomClassTransformer());\n}`,
+          mainExample: {
+            title: "Dynamic Class Generation and Bytecode Instrumentation with ByteBuddy",
+            language: "java",
+            code: `// Dynamic JVM Bytecode Synthesis with ByteBuddy
+import net.bytebuddy.ByteBuddy;
+import net.bytebuddy.implementation.MethodDelegation;
+import net.bytebuddy.implementation.bind.annotation.Origin;
+import net.bytebuddy.implementation.bind.annotation.RuntimeType;
+import net.bytebuddy.implementation.bind.annotation.SuperCall;
+import net.bytebuddy.matcher.ElementMatchers;
+
+import java.lang.reflect.Method;
+import java.util.concurrent.Callable;
+
+public class BytecodeAgentDemo {
+
+    // 1. Performance Interceptor (Injected into bytecode at runtime!)
+    public static class TimingInterceptor {
+        @RuntimeType
+        public static Object intercept(@Origin Method method, @SuperCall Callable<?> callable) throws Exception {
+            long start = System.nanoTime();
+            try {
+                return callable.call(); // Execute original method code
+            } finally {
+                long duration = (System.nanoTime() - start) / 1_000;
+                System.out.printf("[BYTECODE PROFILER] Executed %s() in %d microseconds%n",
+                    method.getName(), duration);
+            }
+        }
+    }
+
+    // 2. Base Domain Service
+    public static class PaymentGateway {
+        public String processTransaction(String accountId, double amount) throws Exception {
+            Thread.sleep(25); // Simulate payment verification latency
+            return "SUCCESS_TX_9921";
+        }
+    }
+
+    public static void main(String[] args) throws Exception {
+        System.out.println("=== Dynamic JVM Bytecode Engineering ===");
+
+        // 3. Dynamically subclass and inject interceptor bytecode into PaymentGateway
+        Class<? extends PaymentGateway> dynamicType = new ByteBuddy()
+            .subclass(PaymentGateway.class)
+            .method(ElementMatchers.named("processTransaction"))
+            .intercept(MethodDelegation.to(TimingInterceptor.class))
+            .make()
+            .load(PaymentGateway.class.getClassLoader())
+            .getLoaded();
+
+        // 4. Instantiate instrumented class
+        PaymentGateway instrumentedService = dynamicType.getDeclaredConstructor().newInstance();
+        String result = instrumentedService.processTransaction("ACC_101", 450.00);
+
+        System.out.printf("✅ Transaction Result: %s%n", result);
+    }
+}`,
+            executable: true,
+            explanation: [
+              "ByteBuddy synthesizes a new JVM class binary in memory with modified method dispatch instructions.",
+              "TimingInterceptor wraps the original method call with high-resolution performance timers.",
+              "The dynamic class is loaded directly into the JVM ClassLoader without writing `.class` files to disk.",
+            ],
+          },
+          detailedExplanation: [
+            "Java Agents (`premain`): By packaging a JAR with a `Premain-Class` manifest header, you can attach an agent via `-javaagent:agent.jar`. The agent's `premain()` method runs before the application's `main()` method, enabling global bytecode transformation.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Modifying classes in the Bootstrap ClassLoader without configuring appropriate boot classpath permissions.",
+              badCode: "inst.retransformClasses(java.lang.String.class); // Throws SecurityException",
+              goodCode: "// Only instrument application domain classes unless explicit agent permissions are granted",
+              explanation: "The JVM strictly protects core `java.lang.*` classes from unverified bytecode mutation.",
+            },
+          ],
+          bestPractices: [
+            "Use ByteBuddy instead of raw ASM for maintainable high-level bytecode transformations.",
+            "Cache dynamic classes to prevent ClassLoader Metaspace memory leaks.",
+            "Use `javap -c -v MyClass.class` to inspect compiled bytecode instructions.",
+          ],
+          summary: [
+            "JVM bytecode consists of compact opcodes executed by the V8/HotSpot interpreter and JIT.",
+            "ByteBuddy and ASM rewrite class structures dynamically at runtime.",
+            "Java Agents enable non-invasive performance monitoring and security auditing.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-java-16",
+      slug: "graalvm-native-image-aot",
+      title: "Module 16: GraalVM Native Image: AOT Compilation & Static Analysis",
+      description: "Build instant-startup native binaries with GraalVM Ahead-Of-Time (AOT) compilation, Closed-World Static Analysis, and reflection metadata.",
+      lessons: [
+        {
+          id: "java-graalvm-native",
+          slug: "graalvm-native-image-aot-compilation-reflection-metadata",
+          courseSlug: "java",
+          moduleSlug: "graalvm-native-image-aot",
+          title: "GraalVM Native Image & Ahead-Of-Time (AOT) Compilation",
+          description: "Transform Java applications into standalone native machine binaries with GraalVM Native Image: Closed-World Assumption, static reachability analysis, Substrate VM runtime, and configuring `reflect-config.json` metadata.",
+          durationMinutes: 26,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "The difference between JIT (Just-In-Time) compilation and GraalVM AOT (Ahead-Of-Time) compilation",
+            "How GraalVM achieves sub-10ms startup time and 30MB base RAM footprint (Substrate VM)",
+            "The Closed-World Assumption: why dynamic class loading and unconfigured reflection fail in native images",
+            "Generating reflection, JNI, and resource metadata using the GraalVM Tracing Agent (`-agentlib:native-image-agent`)",
+          ],
+          introduction: `Traditional Java applications have slow cold starts (several seconds) and high baseline memory consumption (200MB+) due to JVM initialization, class loading, and JIT compilation. GraalVM Native Image compiles Java bytecode directly into a standalone, architecture-specific native machine executable (ELF/Mach-O/PE) Ahead-Of-Time (AOT), containing an embedded micro-runtime (Substrate VM) that launches in under 5 milliseconds with minimal memory.`,
+          whyItMatters: `For Serverless AWS Lambda functions, Kubernetes microservices, and CLI tools, GraalVM Native Image eliminates Java cold start latency and slashes cloud hosting costs by 80%.`,
+          syntax: `native-image -jar app.jar -o app-native\njava -agentlib:native-image-agent=config-output-dir=src/main/resources/META-INF/native-image app.jar`,
+          mainExample: {
+            title: "Configuring GraalVM Native Image Reflection Metadata",
+            language: "json",
+            code: `// META-INF/native-image/reflect-config.json
+// Explicit metadata required by GraalVM Closed-World Static Analysis
+[
+  {
+    "name": "com.kwas.academy.domain.CourseEntity",
+    "allDeclaredConstructors": true,
+    "allPublicMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "org.postgresql.Driver",
+    "methods": [
+      { "name": "<init>", "parameterTypes": [] }
+    ]
+  }
+]`,
+            executable: false,
+            explanation: [
+              "Because GraalVM analyzes reachability at build time, classes invoked via runtime reflection must be explicitly registered in reflect-config.json.",
+              "Unused classes, methods, and libraries are completely stripped from the final binary, producing a tiny 30MB native executable.",
+              "The generated binary executes directly on the OS kernel without requiring an installed Java runtime (JRE).",
+            ],
+          },
+          detailedExplanation: [
+            "Closed-World Assumption: GraalVM assumes all bytecode that will ever execute is known at build time. Dynamic features like `Class.forName(dynamicString)` or dynamic proxies cannot be discovered statically without the GraalVM Tracing Agent.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Compiling code with unconfigured reflection, causing `ClassNotFoundException` at runtime in the native binary.",
+              badCode: "Class.forName(unregisteredClassName).getDeclaredConstructor().newInstance();",
+              goodCode: "// Run application with tracing agent first to automatically generate reflect-config.json",
+              explanation: "The tracing agent intercepts all reflective calls during test runs and generates exact JSON metadata configurations for the native-image compiler.",
+            },
+          ],
+          bestPractices: [
+            "Use frameworks built for GraalVM Native Image (Quarkus, Micronaut, Spring Boot 3+).",
+            "Generate metadata automatically by running integration tests with `-agentlib:native-image-agent`.",
+            "Deploy native images in minimal `FROM scratch` or distroless Docker containers.",
+          ],
+          summary: [
+            "GraalVM Native Image compiles Java bytecode into standalone native executables.",
+            "Delivers sub-10ms startup times and 80% lower RAM footprint for serverless clouds.",
+            "Closed-World Assumption requires explicit reflection and resource configuration metadata.",
+          ],
+        },
+      ],
+    },
   ],
 };

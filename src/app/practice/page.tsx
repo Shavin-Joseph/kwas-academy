@@ -37,7 +37,7 @@ export default function PracticeArenaPage() {
       "@type": "ListItem",
       "position": idx + 1,
       "name": p.title,
-      "url": `https://academy.kwas.tech/practice/${p.id}`,
+      "item": `https://academy.kwas.tech/practice/${p.id}`,
     })),
   };
 

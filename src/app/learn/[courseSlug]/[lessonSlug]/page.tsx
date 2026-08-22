@@ -163,11 +163,6 @@ export default async function LessonDocumentationPage({
           {
             "@type": "ListItem",
             "position": 3,
-            "name": currentModule.title,
-          },
-          {
-            "@type": "ListItem",
-            "position": 4,
             "name": lesson.title,
             "item": `https://academy.kwas.tech/learn/${course.slug}/${lesson.slug}`,
           },
@@ -206,7 +201,6 @@ export default async function LessonDocumentationPage({
               items={[
                 { label: "Courses", href: "/courses" },
                 { label: course.title, href: `/learn/${course.slug}` },
-                { label: currentModule.title },
                 { label: lesson.title },
               ]}
             />

@@ -42,7 +42,7 @@ export default function RoadmapsPage() {
       "position": idx + 1,
       "name": r.title,
       "description": r.description,
-      "url": `https://academy.kwas.tech/roadmaps/${r.slug}`,
+      "item": `https://academy.kwas.tech/roadmaps/${r.slug}`,
     })),
   };
 

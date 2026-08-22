@@ -416,5 +416,505 @@ export const devopsCourse: Course = {
         },
       ],
     },
+    {
+      id: "mod-do-12",
+      slug: "kubernetes-cri-cni-csi-operators",
+      title: "Module 12: Kubernetes Internals: CRI, CNI, CSI & Operators",
+      description: "Master low-level Kubernetes architecture: Container Runtime Interface (CRI/containerd), CNI network plugins (Calico/Cilium), CSI storage drivers, and Custom Resource Definitions (CRDs) with Operators.",
+      lessons: [
+        {
+          id: "do-k8s-internals",
+          slug: "kubernetes-internals-cri-cni-csi-custom-resource-operators",
+          courseSlug: "devops",
+          moduleSlug: "kubernetes-cri-cni-csi-operators",
+          title: "Kubernetes Internals: CRI, CNI, CSI & Custom Operators",
+          description: "Deconstruct the Kubernetes control plane and node architecture: Kubelet interaction with Container Runtime Interface (CRI/containerd), Container Network Interface (CNI IPAM routing), Container Storage Interface (CSI PersistentVolumes), and writing automated controllers with Kubebuilder / Operator SDK.",
+          durationMinutes: 28,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "The lifecycle of a Pod from `kubectl apply` -> API Server -> etcd -> Kubelet -> containerd",
+            "The 3 Kubernetes Plugin Interfaces: CRI (Execution), CNI (Networking), CSI (Storage)",
+            "How CNI plugins (Cilium, Calico) implement Pod IPAM, BGP routing, and NetworkPolicies",
+            "Building custom Kubernetes Operators using Custom Resource Definitions (CRDs) and reconciliation loops",
+          ],
+          introduction: `Kubernetes is not a monolithic container orchestrator; it is an extensible platform built on three standardized plugin interfaces: CRI (Container Runtime Interface), CNI (Container Network Interface), and CSI (Container Storage Interface). Understanding how these interfaces interact with the API Server, etcd, Kubelet, and the Linux kernel allows you to build enterprise-grade infrastructure and custom Kubernetes Operators that manage complex stateful applications automatically.`,
+          whyItMatters: `High-scale cloud platforms (Netflix, OpenAI, Spotify) build custom Kubernetes Operators to automate database failovers, dynamic GPU provisioning, and multi-tenant isolation.`,
+          syntax: `// Custom Resource Definition Schema\napiVersion: apiextensions.k8s.io/v1\nkind: CustomResourceDefinition\nmetadata:\n  name: postgresclusters.db.example.com`,
+          mainExample: {
+            title: "Reconciliation Loop Pattern in a Custom Kubernetes Operator",
+            language: "yaml",
+            code: `# Custom Kubernetes Operator CRD & Go Controller Reconciliation Pattern
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: databaseclusters.kwas.academy
+spec:
+  group: kwas.academy
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                replicas:
+                  type: integer
+                  minimum: 1
+                storageSize:
+                  type: string
+                engineVersion:
+                  type: string
+  scope: Namespaced
+  names:
+    plural: databaseclusters
+    singular: databasecluster
+    kind: DatabaseCluster
+---
+# Example Custom Resource Instance
+apiVersion: kwas.academy/v1alpha1
+kind: DatabaseCluster
+metadata:
+  name: prod-postgres-ha
+  namespace: databases
+spec:
+  replicas: 3
+  storageSize: "500Gi"
+  engineVersion: "16.2"`,
+            executable: false,
+            explanation: [
+              "Custom Resource Definitions (CRDs) extend the Kubernetes API with domain-specific declarative objects.",
+              "A custom Go controller watches the API server for changes to DatabaseCluster objects.",
+              "The Operator's Reconciliation Loop constantly compares Desired State (from CRD spec) against Observed State (running pods).",
+              "If a node crashes, the Operator reconciles state by provisioning new PersistentVolumeClaims via CSI and configuring streaming replication.",
+            ],
+          },
+          detailedExplanation: [
+            "CNI vs Kube-Proxy: Traditional `kube-proxy` uses Linux iptables or IPVS to route Service ClusterIP traffic. Modern eBPF CNIs (like Cilium) bypass kube-proxy entirely, routing packets directly inside the Linux socket layer with zero iptables bottleneck across 10,000+ Services.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Writing Kubernetes Operators with non-idempotent reconciliation loops, causing infinite creation loops when retrying failed API calls.",
+              badCode: "// In Reconcile(): createPod() without checking if pod already exists",
+              goodCode: "// In Reconcile(): check if pod exists; if missing, create; if different, update",
+              explanation: "Kubernetes controllers trigger the reconciliation loop continuously on any event. Every action must be completely idempotent.",
+            },
+          ],
+          bestPractices: [
+            "Use Operator SDK or Kubebuilder (Go) to scaffold production Kubernetes controllers.",
+            "Adopt Cilium as your CNI for eBPF-powered network performance and WireGuard encryption.",
+            "Use CSI storage plugins supporting dynamic volume expansion and snapshots.",
+          ],
+          summary: [
+            "Kubernetes relies on CRI, CNI, and CSI interfaces for compute, networking, and storage.",
+            "CRDs and Operators extend Kubernetes into an autonomic self-healing application platform.",
+            "Reconciliation loops enforce declarative desired state continuously against live cluster state.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-do-13",
+      slug: "service-mesh-istio-envoy-mtls",
+      title: "Module 13: Service Mesh Architecture: Istio, Envoy & mTLS",
+      description: "Master microservice networking: Istio control plane, Envoy sidecar proxy data plane, Mutual TLS (mTLS), and traffic shaping.",
+      lessons: [
+        {
+          id: "do-service-mesh-istio",
+          slug: "service-mesh-architecture-istio-envoy-proxy-mtls-traffic-shaping",
+          courseSlug: "devops",
+          moduleSlug: "service-mesh-istio-envoy-mtls",
+          title: "Service Mesh: Istio, Envoy Proxy & Zero-Trust mTLS",
+          description: "Architect cloud-native microservice service meshes: Istio control plane (Istiod), Envoy proxy sidecar injection, automatic Mutual TLS (mTLS) cryptographic encryption, VirtualServices, DestinationRules, and distributed circuit breaking.",
+          durationMinutes: 28,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "The Service Mesh architecture: Control Plane (Istiod) vs Data Plane (Envoy Proxies)",
+            "Automatic sidecar injection and iptables packet interception (`PREROUTING` -> 15001)",
+            "Enforcing zero-trust network encryption with automatic Strict Mutual TLS (mTLS)",
+            "Advanced traffic shaping: percentage-based canary routing, header-based routing, and fault injection with Istio",
+          ],
+          introduction: `As microservice clusters scale to hundreds of independent services, managing network security, retries, rate limiting, and observability inside individual application codebases becomes unmaintainable. A Service Mesh injects an ultra-fast C++ proxy (Envoy) next to every application container as a sidecar. The proxies intercept all inbound and outbound TCP/HTTP/gRPC traffic, automatically encrypting connections with Mutual TLS and providing deep telemetry without changing a single line of application code.`,
+          whyItMatters: `Financial institutions and compliance standards (HIPAA, PCI-DSS) require end-to-end encryption in transit (mTLS) between all microservices. Istio enforces strict mTLS automatically with SPIFFE-compliant identity certificates.`,
+          syntax: `apiVersion: security.istio.io/v1beta1\nkind: PeerAuthentication\nmetadata:\n  name: default\nspec:\n  mtls:\n    mode: STRICT`,
+          mainExample: {
+            title: "Istio Strict mTLS Enforcement and Canary Traffic Routing",
+            language: "yaml",
+            code: `# 1. Enforce Strict Mutual TLS Across the Entire Kubernetes Namespace
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: production
+spec:
+  mtls:
+    mode: STRICT # Rejects all non-mTLS plain HTTP traffic automatically
+---
+# 2. Istio VirtualService: Dynamic Canary Percentage Traffic Split
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: payment-service-route
+  namespace: production
+spec:
+  hosts:
+    - payment-service
+  http:
+    - route:
+        - destination:
+            host: payment-service
+            subset: v1
+          weight: 90
+        - destination:
+            host: payment-service
+            subset: v2-canary
+          weight: 10
+      timeout: 3s
+      retries:
+        attempts: 3
+        perTryTimeout: 500ms
+        retryOn: "5xx,connect-failure,refused-stream"
+---
+# 3. DestinationRule: Subsets and Outlier Detection (Circuit Breaker)
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: payment-service-subsets
+  namespace: production
+spec:
+  host: payment-service
+  subsets:
+    - name: v1
+      labels:
+        version: "1.12.0"
+    - name: v2-canary
+      labels:
+        version: "2.0.0-rc1"
+  trafficPolicy:
+    outlierDetection: # Circuit Breaker: Eject unhealthy pods from load balancer
+      consecutive5xxErrors: 3
+      interval: 10s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50`,
+            executable: false,
+            explanation: [
+              "PeerAuthentication with mode: STRICT forces all pods to communicate over encrypted mTLS tunnels with rotating X.509 certificates.",
+              "VirtualService splits traffic: 90% to v1 and 10% to v2-canary with automatic retries and 3s timeout.",
+              "DestinationRule defines pod subsets via Kubernetes labels.",
+              "OutlierDetection acts as an automated Circuit Breaker, ejecting pods returning three consecutive 5xx errors from the proxy pool.",
+            ],
+          },
+          detailedExplanation: [
+            "Ambient Mesh vs Sidecars: Istio Ambient Mesh eliminates the sidecar proxy from application pods, using a shared node-level Layer 4 Zero-Trust Tunnel (ztunnel) and optional Layer 7 Waypoint proxies, reducing cluster RAM consumption by up to 80%.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Enabling Strict mTLS before all legacy services or external databases have Istio sidecars injected, causing connection dropouts.",
+              badCode: "mode: STRICT # Applied immediately in heterogeneous legacy cluster",
+              goodCode: "mode: PERMISSIVE # Test first; allows both plain text and mTLS until all pods are sidecar-injected",
+              explanation: "Use PERMISSIVE mode during migration so non-mesh services can still connect while verifying mTLS metrics in Grafana.",
+            },
+          ],
+          bestPractices: [
+            "Use Istio `PeerAuthentication` in STRICT mode for zero-trust compliance.",
+            "Configure OutlierDetection circuit breakers on all external API outbound routes.",
+            "Consider Istio Ambient Mesh for large clusters to reduce sidecar CPU/RAM overhead.",
+          ],
+          summary: [
+            "Service Meshes decouple networking, security, and telemetry from application code.",
+            "Istio and Envoy provide automatic zero-trust mTLS encryption across all pods.",
+            "VirtualServices and DestinationRules enable canary routing, retries, and circuit breaking.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-do-14",
+      slug: "gitops-argocd-declarative-delivery",
+      title: "Module 14: GitOps & Declarative Delivery: ArgoCD & Helm",
+      description: "Master declarative GitOps workflows: ArgoCD application controller, Helm chart versioning, Kustomize overlays, and automated self-healing.",
+      lessons: [
+        {
+          id: "do-gitops-argocd",
+          slug: "gitops-declarative-delivery-argocd-helm-kustomize-self-healing",
+          courseSlug: "devops",
+          moduleSlug: "gitops-argocd-declarative-delivery",
+          title: "GitOps Continuous Delivery: ArgoCD, Helm & Self-Healing",
+          description: "Implement modern GitOps delivery pipelines: Git as the single source of truth, ArgoCD Application controller architecture, Kustomize environment overlays (dev/stage/prod), automated drift detection, and self-healing cluster synchronization.",
+          durationMinutes: 26,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "The 4 principles of OpenGitOps: Declarative, Versioned & Immutable, Pulled Automatically, Continuously Reconciled",
+            "Why Push CI/CD pipelines (running `kubectl` from Jenkins/GitHub Actions) expose critical security credentials",
+            "Configuring ArgoCD Applications with automated sync policies, prune, and selfHeal",
+            "Managing multi-environment Kubernetes configurations using Kustomize overlays",
+          ],
+          introduction: `In traditional Push-based CI/CD pipelines, build runners in CI (GitHub Actions, Jenkins) require cluster-admin credentials to execute \`kubectl apply\` directly against production Kubernetes. In the GitOps paradigm, Git is the single source of truth for desired infrastructure state. An in-cluster Pull agent (ArgoCD) continuously monitors Git, detects configuration drifts, and reconciles the cluster to match Git automatically—with zero cluster credentials ever leaving the private network.`,
+          whyItMatters: `GitOps provides instant rollbacks via \`git revert\`, prevents manual configuration drift (hotfixes overridden by CI), and provides a cryptographic audit log of every infrastructure change.`,
+          syntax: `apiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: payment-service\nspec:\n  syncPolicy:\n    automated:\n      prune: true\n      selfHeal: true`,
+          mainExample: {
+            title: "ArgoCD Declarative Application Manifest with Automated Self-Healing",
+            language: "yaml",
+            code: `# Declarative ArgoCD Application Manifest (GitOps Single Source of Truth)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kwas-core-platform
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/kwas-academy/infrastructure-gitops.git'
+    targetRevision: main # Git branch / commit SHA / Helm tag
+    path: environments/production # Path to Kustomize overlays
+  destination:
+    server: 'https://kubernetes.default.svc' # Target In-Cluster API Server
+    namespace: production
+  syncPolicy:
+    automated:
+      prune: true # Deletes resources from K8s if removed from Git repo
+      selfHeal: true # Automatically reverts any manual 'kubectl edit' changes!
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m`,
+            executable: false,
+            explanation: [
+              "repoURL and path point to the Git repository containing Kustomize manifests.",
+              "automated.prune ensures that deleting a file in Git removes the corresponding resource from Kubernetes.",
+              "automated.selfHeal detects manual ad-hoc kubectl modifications in the cluster and immediately reverts them to match Git.",
+              "resources-finalizer ensures that deleting the ArgoCD application cleans up all managed resources cleanly.",
+            ],
+          },
+          detailedExplanation: [
+            "App of Apps Pattern: In enterprise setups, rather than managing 100 individual ArgoCD application YAMLs, teams deploy an 'App of Apps'—a single root ArgoCD Application that points to a folder containing other Application manifests, automating multi-cluster bootstrapping.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Storing plain-text database secrets in GitOps repositories without cryptographic encryption.",
+              badCode: "apiVersion: v1\nkind: Secret\ndata:\n  DB_PASS: cGFzc3dvcmQxMjM= # Decodable base64 in Git!",
+              goodCode: "# Use SealedSecrets (Bitnami) or External Secrets Operator with HashiCorp Vault / AWS Secrets Manager",
+              explanation: "Base64 is encoding, not encryption. Always use SealedSecrets or External Secrets Operator so only encrypted ciphertexts are committed to Git.",
+            },
+          ],
+          bestPractices: [
+            "Enable `selfHeal: true` and `prune: true` in production ArgoCD applications.",
+            "Use Kustomize overlays to share base YAML configurations across dev, staging, and prod.",
+            "Deploy External Secrets Operator to securely inject secrets from AWS KMS or HashiCorp Vault.",
+          ],
+          summary: [
+            "GitOps uses Git as the declarative, auditable single source of truth for infrastructure.",
+            "ArgoCD pulls changes from Git, preventing cluster credential exposure in CI systems.",
+            "Automated drift detection and self-healing prevent undocumented configuration drifts.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-do-15",
+      slug: "zero-trust-cloud-security-spiffe-vault",
+      title: "Module 15: Zero-Trust Cloud Security: SPIFFE/SPIRE & Vault",
+      description: "Master zero-trust workload identity: SPIFFE IDs, SPIRE attestation, HashiCorp Vault dynamic secrets, and Cloud KMS encryption.",
+      lessons: [
+        {
+          id: "do-zero-trust-security",
+          slug: "zero-trust-workload-identity-spiffe-spire-hashicorp-vault-kms",
+          courseSlug: "devops",
+          moduleSlug: "zero-trust-cloud-security-spiffe-vault",
+          title: "Zero-Trust Security: SPIFFE/SPIRE & HashiCorp Vault",
+          description: "Establish zero-trust workload identities without static credentials: the SPIFFE standard (Secure Production Identity Framework for Everyone), SPIRE node and workload attestation, HashiCorp Vault dynamic ephemeral database credentials, and KMS envelope encryption.",
+          durationMinutes: 28,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "Why perimeter network security (IP whitelisting, firewalls) is obsolete in cloud-native environments",
+            "The SPIFFE standard: SPIFFE IDs (`spiffe://domain/ns/prod/sa/payment`) and X.509 SVID tokens",
+            "How SPIRE Agent performs cryptographic workload attestation on Linux cgroups and K8s namespaces",
+            "Generating dynamic short-lived (15-minute) database credentials with HashiCorp Vault",
+          ],
+          introduction: `In legacy enterprise networks, security assumed everything inside the internal corporate network was trusted ('castle-and-moat'). In modern multi-cloud architectures, perimeter security is inadequate: if an attacker compromises one service, they move laterally across the entire network. Zero-Trust enforces: 'Never Trust, Always Verify'. Every single workload must cryptographically prove its identity via SPIFFE/SPIRE before accessing databases or APIs.`,
+          whyItMatters: `Eliminates long-lived static API keys and passwords. If a server is breached, attackers find zero static passwords, and credentials expire automatically in minutes.`,
+          syntax: `// SPIFFE ID URI format\nspiffe://kwas.academy/ns/production/sa/payment-service`,
+          mainExample: {
+            title: "HashiCorp Vault Dynamic PostgreSQL Credential Generation",
+            language: "bash",
+            code: `#!/usr/bin/env bash
+# Zero-Trust Ephemeral Credential Provisioning via HashiCorp Vault
+
+set -euo pipefail
+
+echo "=== Zero-Trust Identity & Vault Dynamic Secret Engine ==="
+
+# 1. Inspect Workload SPIFFE ID from SPIRE Agent
+SPIFFE_ID="spiffe://kwas.academy/ns/production/sa/payment-processor"
+echo "[1] Verified Workload Cryptographic SPIFFE ID: $SPIFFE_ID"
+
+# 2. Workload requests short-lived dynamic PostgreSQL database credentials
+echo -e "\\n[2] Requesting ephemeral dynamic credentials from HashiCorp Vault API..."
+
+# Simulating Vault CLI response for dynamic DB credentials
+# Vault creates a new PostgreSQL user on-the-fly with 1-hour TTL!
+VAULT_RESPONSE='{
+  "lease_id": "database/creds/readonly-role/h73b821a9c",
+  "lease_duration": 3600,
+  "renewable": true,
+  "data": {
+    "username": "v_db_user_kwas_982",
+    "password": "v_tok_7a9f2bc8914e6b12a80c98f"
+  }
+}'
+
+DB_USER=$(echo "$VAULT_RESPONSE" | grep '"username"' | cut -d '"' -f 4)
+LEASE_ID=$(echo "$VAULT_RESPONSE" | grep '"lease_id"' | cut -d '"' -f 4)
+
+echo "Vault Generated DB Username: $DB_USER"
+echo "Credential Lease ID:        $LEASE_ID (Auto-revoked after 1 hour)"
+
+# 3. Revoke lease immediately upon task completion (Zero Credential Leakage!)
+echo -e "\\n[3] Revoking credential lease in Vault after batch completion..."
+echo "Lease $LEASE_ID successfully revoked in PostgreSQL database."
+echo -e "\\n✅ Zero static passwords stored in config files or environment variables!"`,
+            executable: false,
+            explanation: [
+              "Workloads receive short-lived X.509 SVID certificates bound to their SPIFFE ID without static API keys.",
+              "Vault generates unique PostgreSQL usernames and passwords dynamically with a strict Time-To-Live (TTL).",
+              "When the lease expires, Vault automatically executes DROP ROLE in the database, invalidating the password.",
+              "Eliminates hardcoded passwords from Git, environment variables, and Docker container images.",
+            ],
+          },
+          detailedExplanation: [
+            "Envelope Encryption with Cloud KMS: Application data is encrypted using a local Data Encryption Key (DEK). The DEK is encrypted using a Master Key (KEK) stored securely in Hardware Security Modules (HSM / AWS KMS / GCP Cloud KMS). The plaintext DEK is never written to disk.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Storing production cloud credentials or IAM access keys in long-lived environment variables.",
+              badCode: "export AWS_SECRET_ACCESS_KEY=\"wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY\" # Permanent risk!",
+              goodCode: "# Use IAM Roles for Service Accounts (IRSA) / SPIFFE workload identity federation",
+              explanation: "Static cloud credentials dumped in process memory or logs lead to cloud compromise. Always use IAM Role federation.",
+            },
+          ],
+          bestPractices: [
+            "Use HashiCorp Vault Dynamic Secrets for all database and third-party API connections.",
+            "Deploy SPIFFE/SPIRE for cross-cloud workload identity attestation.",
+            "Enforce KMS Envelope Encryption for all sensitive data at rest.",
+          ],
+          summary: [
+            "Zero-Trust enforces continuous cryptographic authentication between all services.",
+            "SPIFFE/SPIRE issues tamper-proof X.509 workload identities to containers dynamically.",
+            "HashiCorp Vault generates dynamic ephemeral database passwords that expire automatically.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-do-16",
+      slug: "distributed-observability-opentelemetry-tempo",
+      title: "Module 16: Distributed Observability: OpenTelemetry & Tempo",
+      description: "Master enterprise telemetry: OpenTelemetry (OTel Collector, OTLP), distributed trace context propagation (W3C), and Grafana Tempo.",
+      lessons: [
+        {
+          id: "do-opentelemetry-tempo",
+          slug: "distributed-observability-opentelemetry-collector-w3c-tempo",
+          courseSlug: "devops",
+          moduleSlug: "distributed-observability-opentelemetry-tempo",
+          title: "Distributed Observability: OpenTelemetry & Grafana Tempo",
+          description: "Build unified observability pipelines across distributed microservices: the 3 Pillars of Observability (Metrics, Logs, Traces), OpenTelemetry (OTel) Collector architecture, W3C TraceContext distributed propagation (`traceparent`), and Grafana Tempo distributed tracing.",
+          durationMinutes: 28,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "The 3 Pillars of Observability and why OpenTelemetry (OTel) is the vendor-neutral industry standard",
+            "Distributed Trace Context Propagation across HTTP/gRPC boundaries using W3C `traceparent` headers",
+            "The OpenTelemetry Collector pipeline: Receivers, Processors (Batch, Tail-sampling), and Exporters",
+            "Visualizing multi-service latency bottlenecks and database query spans in Grafana Tempo and Jaeger",
+          ],
+          introduction: `When an e-commerce checkout request takes 4.5 seconds and passes through 12 microservices (API Gateway, Auth, Inventory, Payment, Shipping, Notification), looking at isolated server logs is useless. Distributed Tracing assigns a unique \`TraceID\` to the user's initial click and propagates it across every HTTP header, RPC call, message queue, and database query, generating a unified visual Gantt chart of the exact latency contributed by every span.`,
+          whyItMatters: `OpenTelemetry provides vendor neutrality: instrument your code once with OTel SDKs, and export traces, metrics, and logs interchangeably to Prometheus, Tempo, Datadog, or Honeycomb without vendor lock-in.`,
+          syntax: `// W3C Trace Context Header\ntraceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01`,
+          mainExample: {
+            title: "OpenTelemetry Distributed Trace Context Propagation in JavaScript / Node.js",
+            language: "javascript",
+            code: `// OpenTelemetry Distributed Trace Context Propagation Engine
+class DistributedTraceContext {
+    constructor() {
+        this.traceId = this._generateHex(16); // 128-bit Trace ID (Shared across all microservices!)
+        this.spanId = this._generateHex(8);   // 64-bit Current Span ID
+    }
+
+    _generateHex(bytes) {
+        let result = '';
+        for (let i = 0; i < bytes; i++) {
+            result += Math.floor(Math.random() * 256).toString(16).padStart(2, '0');
+        }
+        return result;
+    }
+
+    // Format into standard W3C 'traceparent' header (RFC 00-traceId-spanId-flags)
+    toW3CHeader() {
+        return \`00-\${this.traceId}-\${this.spanId}-01\`;
+    }
+
+    // Create child span for downstream RPC call
+    createChildSpan() {
+        const child = new DistributedTraceContext();
+        child.traceId = this.traceId; // Retains global trace ID!
+        child.parentSpanId = this.spanId;
+        return child;
+    }
+}
+
+// 1. Inbound Request at API Gateway
+const gatewaySpan = new DistributedTraceContext();
+console.log("=== OpenTelemetry Distributed Tracing Engine ===");
+console.log("[API GATEWAY] Generated Trace ID:  ", gatewaySpan.traceId);
+console.log("[API GATEWAY] Outgoing W3C Header: ", gatewaySpan.toW3CHeader());
+
+// 2. Downstream Payment Microservice receives header & continues trace
+const paymentSpan = gatewaySpan.createChildSpan();
+console.log("\\n[PAYMENT SERVICE] Ingested Trace ID: ", paymentSpan.traceId);
+console.log("[PAYMENT SERVICE] New Child Span ID:  ", paymentSpan.spanId);
+console.log("[PAYMENT SERVICE] Parent Span ID:     ", paymentSpan.parentSpanId);
+
+console.log("\\n✅ Distributed context propagated seamlessly across network boundaries!");`,
+            executable: true,
+            explanation: [
+              "W3C TraceContext standardizes the 'traceparent' header format across all languages and frameworks.",
+              "All downstream microservices and async worker jobs inherit the exact same Trace ID.",
+              "Parent-Child span relationships allow Grafana Tempo to assemble the complete end-to-end execution tree.",
+              "OpenTelemetry Collector batches and tail-samples traces, sending 100% of errors and 1% of successful spans to storage.",
+            ],
+          },
+          detailedExplanation: [
+            "Tail-Based Sampling: Traditional head-sampling decides whether to drop a trace at the start before knowing if it will fail. The OTel Collector with Tail-Based Sampling buffers complete traces in memory, guaranteeing that any trace containing an HTTP 500 error or latency > 2000ms is preserved and exported.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Using proprietary vendor SDKs (Datadog, New Relic) directly throughout business logic, creating permanent vendor lock-in.",
+              badCode: "import datadog from 'dd-trace'; // Tight coupling to proprietary SDK",
+              goodCode: "import { trace } from '@opentelemetry/api'; // Vendor-neutral OpenTelemetry standard",
+              explanation: "Use OpenTelemetry API/SDKs in application code. You can switch backend observability platforms in minutes via the OTel Collector configuration.",
+            },
+          ],
+          bestPractices: [
+            "Instrument code with vendor-neutral OpenTelemetry APIs (`@opentelemetry/api`).",
+            "Deploy OpenTelemetry Collector as a DaemonSet to receive OTLP telemetry from all pods.",
+            "Use Grafana Tempo for cost-effective distributed trace storage on object storage (S3/GCS).",
+          ],
+          summary: [
+            "Distributed tracing solves microservice latency debugging by connecting multi-service spans.",
+            "OpenTelemetry (OTel) is the industry standard for metrics, logs, and traces.",
+            "W3C TraceContext header (`traceparent`) propagates causal context across distributed systems.",
+          ],
+        },
+      ],
+    },
   ],
 };

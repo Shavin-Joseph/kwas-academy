@@ -417,5 +417,482 @@ export const pythonCourse: Course = {
         },
       ],
     },
+    {
+      id: "mod-py-12",
+      slug: "cpython-gil-free-threading-jit",
+      title: "Module 12: CPython GIL Free-Threading (PEP 703) & Tier-2 JIT",
+      description: "Explore the CPython interpreter: PEP 703 Free-Threaded Python without the GIL, Tier-2 Copy-and-Patch JIT compiler, and opcode specialization.",
+      lessons: [
+        {
+          id: "py-gil-jit",
+          slug: "cpython-gil-free-threading-pep-703-tier-2-jit",
+          courseSlug: "python",
+          moduleSlug: "cpython-gil-free-threading-jit",
+          title: "CPython GIL Free-Threading & Tier-2 JIT Compiler",
+          description: "Deconstruct the internal architecture of modern CPython 3.13+: removing the Global Interpreter Lock (PEP 703 Free-Threading), the Tier-2 Copy-and-Patch JIT compiler, and Adaptive Specializing Opcode evaluation (PEP 659).",
+          durationMinutes: 24,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "Why CPython historically relied on the Global Interpreter Lock (GIL) for memory safety",
+            "How PEP 703 Free-Threading enables true multi-core parallel CPU execution using Mimalloc biased reference counting",
+            "The Tier-2 Copy-and-Patch JIT compilation pipeline (Bytecode → Micro-ops → Native Machine Code)",
+            "Specializing Adaptive Interpreter (PEP 659) opcodes (e.g. `LOAD_ATTR_MODULE`, `BINARY_OP_ADD_INT`)",
+          ],
+          introduction: `For over three decades, the Global Interpreter Lock (GIL) prevented standard Python threads from executing CPU-bound bytecode in parallel on multi-core processors. Python 3.13+ introduces experimental Free-Threading (PEP 703), replacing the global mutex with biased reference counting and thread-safe allocators (Mimalloc), alongside a Copy-and-Patch JIT compiler that converts hot micro-ops into native x86_64/ARM64 machine instructions.`,
+          whyItMatters: `Free-threaded Python unlocks true CPU parallelism without multiprocessing IPC overhead, dramatically accelerating data science, machine learning inference, and high-frequency backend services.`,
+          syntax: `# Run free-threaded Python 3.13+\nPYTHON_GIL=0 python -X gil=0 script.py\nimport sys\nprint(sys._is_gil_enabled())`,
+          mainExample: {
+            title: "Inspecting GIL Status and Specializing Bytecode in Python 3.13+",
+            language: "python",
+            code: `# CPython 3.13+ Free-Threading and Bytecode Inspection
+import sys
+import dis
+import threading
+import time
+
+# 1. Verify GIL Free-Threading Status
+gil_status = getattr(sys, "_is_gil_enabled", lambda: True)()
+print(f"=== CPython Runtime Diagnostics ===")
+print(f"Global Interpreter Lock (GIL) Active: {gil_status}")
+if not gil_status:
+    print("🚀 True multi-core parallel thread execution is ACTIVE!")
+
+# 2. Inspecting Adaptive Specializing Bytecode (PEP 659)
+def compute_vector_dot_product(a: int, b: int) -> int:
+    return a * b + 42
+
+print("\n--- Disassembled Specialized Bytecode ---")
+dis.dis(compute_vector_dot_product)
+
+# 3. Multi-Threaded Parallel Execution Benchmark
+def cpu_heavy_task(thread_id: int):
+    total = sum(i * i for i in range(1_000_000))
+    # print(f"Thread {thread_id} completed calculation.")
+
+threads = [threading.Thread(target=cpu_heavy_task, args=(i,)) for i in range(4)]
+start = time.perf_counter()
+for t in threads: t.start()
+for t in threads: t.join()
+print(f"Parallel Execution Finished in {time.perf_counter() - start:.3f}s")`,
+            executable: true,
+            explanation: [
+                "sys._is_gil_enabled() returns False on free-threaded Python builds (python3.13t).",
+                "dis.dis reveals how Python translates high-level functions into specialized opcodes (BINARY_OP_MULTIPLY_INT).",
+                "In free-threaded Python, the 4 CPU threads execute simultaneously on 4 distinct physical CPU cores.",
+            ],
+          },
+          detailedExplanation: [
+            "Copy-and-Patch JIT Engine: CPython's Tier-2 optimizer collects execution traces from frequently called loops. It emits low-level micro-operations (uops), optimizes them, and stitches together pre-compiled machine code stubs ('copy-and-patch') with minimal JIT compilation latency.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Assuming all legacy C extensions (C-API) work automatically without changes on free-threaded Python.",
+              badCode: "import legacy_c_extension # May crash if it assumes GIL protects internal globals",
+              goodCode: "import PyMutex # Use thread-safe C-API mutexes in native extensions",
+              explanation: "Native C extensions that relied on the GIL for synchronization must be updated with thread-safe locks.",
+            },
+          ],
+          bestPractices: [
+            "Benchmark multi-threaded code with `PYTHON_GIL=0` to verify linear CPU scaling.",
+            "Use `threading.Thread` for CPU tasks on free-threaded Python instead of heavy `multiprocessing`.",
+            "Profile hot code paths using `dis.dis` with `adaptive=True` to inspect specialization.",
+          ],
+          summary: [
+            "PEP 703 enables GIL-free Python with true multi-core parallel threading.",
+            "Tier-2 Copy-and-Patch JIT compiles hot micro-ops into native machine code.",
+            "Adaptive opcodes specialize type-specific execution for significant speedups.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-py-13",
+      slug: "advanced-asyncio-transports-protocols",
+      title: "Module 13: Advanced asyncio: Custom Transports & TaskGroups",
+      description: "Master low-level asyncio architecture: Transports, Protocols, TaskGroups (Python 3.11+), and uvloop event loops.",
+      lessons: [
+        {
+          id: "py-asyncio-internals",
+          slug: "python-asyncio-transports-protocols-taskgroups-uvloop",
+          courseSlug: "python",
+          moduleSlug: "advanced-asyncio-transports-protocols",
+          title: "asyncio Architecture: Transports, Protocols & TaskGroups",
+          description: "Dive deep into Python's asynchronous event loop: raw TCP socket streaming with Transports & Protocols, Structured Concurrency with `asyncio.TaskGroup`, and high-performance `uvloop` integration.",
+          durationMinutes: 24,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "The architecture of asyncio: Futures, Tasks, Coroutines, and Event Loop selectors",
+            "Low-level streaming with `asyncio.Transport` and `asyncio.Protocol` callbacks",
+            "Structured Concurrency using `async with asyncio.TaskGroup()` for error propagation",
+            "Replacing default selectors with `uvloop` (libuv-based event loop) for 2x-4x throughput",
+          ],
+          introduction: `While high-level asyncio functions like \`asyncio.gather()\` and \`asyncio.sleep()\` are common, enterprise network engines (like FastAPI and Uvicorn) operate at the lower Transport and Protocol layer. Transports represent the raw communication channel (TCP, UDP, SSL), while Protocols define the message parsing logic through deterministic event callbacks.`,
+          whyItMatters: `Structured Concurrency with \`asyncio.TaskGroup\` ensures that if one concurrent task fails, all sibling tasks are automatically cancelled immediately, preventing dangling background tasks and resource leaks.`,
+          syntax: `async with asyncio.TaskGroup() as tg:\n  task1 = tg.create_task(fetch_user())\n  task2 = tg.create_task(fetch_orders())`,
+          mainExample: {
+            title: "Structured Concurrency with TaskGroup and Low-Level Protocol",
+            language: "python",
+            code: `# Python 3.11+ Structured Concurrency with TaskGroup & Custom Protocol
+import asyncio
+
+# 1. Low-Level TCP Protocol Definition
+class EchoServerProtocol(asyncio.Protocol):
+    def connection_made(self, transport):
+        self.transport = transport
+        peername = transport.get_extra_info('peername')
+        print(f"[Protocol] Connection established from {peername}")
+
+    def data_received(self, data):
+        message = data.decode()
+        print(f"[Protocol] Received data: {message.strip()}")
+        # Echo data back over transport
+        self.transport.write(f"KWAS-ACK: {message}".encode())
+
+    def connection_lost(self, exc):
+        print("[Protocol] Client disconnected.")
+
+# 2. Structured Concurrency Task Runner
+async def query_microservice(service_name: str, delay: float) -> str:
+    await asyncio.sleep(delay)
+    return f"{service_name} operational"
+
+async def main():
+    print("=== Structured Concurrency with asyncio.TaskGroup ===")
+    
+    # TaskGroup guarantees that if any task crashes, all siblings are cancelled!
+    async with asyncio.TaskGroup() as tg:
+        task_auth = tg.create_task(query_microservice("AuthService", 0.05))
+        task_billing = tg.create_task(query_microservice("BillingService", 0.08))
+        task_analytics = tg.create_task(query_microservice("AnalyticsService", 0.03))
+
+    # All tasks guaranteed to have completed here cleanly
+    print(f"✅ Auth: {task_auth.result()}")
+    print(f"✅ Billing: {task_billing.result()}")
+    print(f"✅ Analytics: {task_analytics.result()}")
+
+asyncio.run(main())`,
+            executable: true,
+            explanation: [
+              "async with asyncio.TaskGroup() creates a structured concurrency scope.",
+              "If any task inside the TaskGroup raises an unhandled exception, TaskGroup immediately cancels all remaining sibling tasks and raises an ExceptionGroup.",
+              "EchoServerProtocol processes network packets with zero coroutine wrapping overhead.",
+            ],
+          },
+          detailedExplanation: [
+            "uvloop Integration: `uvloop` is a drop-in replacement for the default Python asyncio event loop written in Cython on top of libuv. Calling `uvloop.install()` boosts Python async HTTP socket throughput to speeds comparable to Go and Node.js.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Using `asyncio.gather()` without exception handlers, which allows failed tasks to leave sibling tasks running in the background indefinitely.",
+              badCode: "results = await asyncio.gather(task1(), task2()) # Can leak tasks on error",
+              goodCode: "async with asyncio.TaskGroup() as tg: t1 = tg.create_task(task1()); ...",
+              explanation: "`asyncio.gather()` does not automatically cancel sibling tasks if one fails. `TaskGroup` guarantees deterministic structured cleanup.",
+            },
+          ],
+          bestPractices: [
+            "Prefer `asyncio.TaskGroup` over `asyncio.gather` for all new Python 3.11+ code.",
+            "Use `uvloop.install()` at your application entry point for maximum network throughput.",
+            "Always shield critical cleanup operations using `asyncio.shield()` when handling cancellations.",
+          ],
+          summary: [
+            "asyncio separates byte transmission (Transports) from message parsing (Protocols).",
+            "`TaskGroup` enforces Structured Concurrency with automatic sibling task cancellation.",
+            "`uvloop` brings C-speed libuv event loop performance to Python applications.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-py-14",
+      slug: "metaclasses-descriptor-protocol-mro",
+      title: "Module 14: Metaclasses, Descriptor Protocol & MRO Resolution",
+      description: "Master Python OOP metaprogramming: custom metaclasses (`type`), the 3-method Descriptor protocol, and C3 Linearization (MRO).",
+      lessons: [
+        {
+          id: "py-metaclasses-descriptors",
+          slug: "python-metaclasses-descriptor-protocol-c3-mro",
+          courseSlug: "python",
+          moduleSlug: "metaclasses-descriptor-protocol-mro",
+          title: "Metaclasses, Descriptors & C3 Linearization (MRO)",
+          description: "Master Python's deepest object model internals: intercepting class creation with Metaclasses (`__new__`, `__init__`), building validated fields with the Descriptor Protocol (`__get__`, `__set__`, `__set_name__`), and understanding C3 Linearization (Method Resolution Order).",
+          durationMinutes: 24,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "How classes are themselves instances of metaclasses (`type`)",
+            "The Descriptor Protocol: `__get__`, `__set__`, `__delete__`, and `__set_name__`",
+            "Building an ORM field validator using descriptors and `__init_subclass__`",
+            "Method Resolution Order (MRO) calculation using the C3 Linearization algorithm",
+          ],
+          introduction: `In Python, everything is an object—including classes themselves. Metaclasses are the blueprints for classes. By overriding a metaclass's \`__new__\` method, frameworks like Django ORM, Pydantic, and SQLAlchemy inspect class attributes, validate types, and construct database mappings before the class is even instantiated into memory.`,
+          whyItMatters: `Descriptors power Python's built-in \`@property\`, \`@classmethod\`, and \`@staticmethod\` decorators. Understanding descriptors allows you to write reusable attribute validation engines with zero boilerplate.`,
+          syntax: `class TypedField:\n  def __set_name__(self, owner, name): self.name = name\n  def __set__(self, instance, value): ...\n\nclass Meta(type):\n  def __new__(mcs, name, bases, attrs): ...`,
+          mainExample: {
+            title: "Type-Safe Model Architecture with Descriptors and Metaclasses",
+            language: "python",
+            code: `# Metaprogramming with Descriptors and Metaclasses
+
+# 1. Type-Enforcing Descriptor Protocol
+class ValidatedString:
+    def __init__(self, min_len: int = 1, max_len: int = 100):
+        self.min_len = min_len
+        self.max_len = max_len
+
+    def __set_name__(self, owner, name):
+        # Automatically captures the attribute name on the owner class
+        self.storage_name = f"_{name}"
+
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+        return getattr(instance, self.storage_name, "")
+
+    def __set__(self, instance, value):
+        if not isinstance(value, str):
+            raise TypeError(f"Attribute must be a string, got {type(value).__name__}")
+        if not (self.min_len <= len(value) <= self.max_len):
+            raise ValueError(f"Length must be between {self.min_len} and {self.max_len} chars.")
+        setattr(instance, self.storage_name, value)
+
+# 2. Metaclass registering all managed domain entities
+class ModelRegistryMeta(type):
+    registry = {}
+
+    def __new__(mcs, name, bases, attrs):
+        cls = super().__new__(mcs, name, bases, attrs)
+        if name != "BaseModel":
+            mcs.registry[name] = cls
+            print(f"[Metaclass] Registered Model: {name}")
+        return cls
+
+class BaseModel(metaclass=ModelRegistryMeta):
+    pass
+
+# 3. Clean Domain Class Definition
+class CourseEntity(BaseModel):
+    title = ValidatedString(min_len=3, max_len=50)
+    slug = ValidatedString(min_len=2, max_len=30)
+
+    def __init__(self, title: str, slug: str):
+        self.title = title
+        self.slug = slug
+
+# Demonstration
+course = CourseEntity("Distributed Systems", "distributed-systems")
+print(f"✅ Created Course: {course.title} (Slug: {course.slug})")
+
+# Validations fire automatically on assignment!
+try:
+    course.title = "" # Raises ValueError
+except ValueError as e:
+    print(f"Validation Caught: {e}")`,
+            executable: true,
+            explanation: [
+              "__set_name__ automatically discovers the attribute variable name ('title', 'slug') without hardcoding strings.",
+              "__set__ intercepts every assignment (course.title = '...'), executing validation before storing in private instance dict.",
+              "ModelRegistryMeta intercepts the class definition at import time, registering it in the global entity catalog.",
+            ],
+          },
+          detailedExplanation: [
+            "C3 Linearization Algorithm: When a class inherits from multiple parents (`class D(B, C)`), Python computes its Method Resolution Order (`D.__mro__`) using C3 Linearization. It guarantees that child classes precede parent classes and preserves the local precedence order of base classes.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Storing descriptor values directly on the descriptor instance `self.val` instead of on the target object `instance`.",
+              badCode: "def __set__(self, instance, value): self.val = value # Overwrites across ALL instances!",
+              goodCode: "def __set__(self, instance, value): setattr(instance, self.storage_name, value)",
+              explanation: "Descriptors are class attributes shared across all instances. Storing state on `self` shares data across every object.",
+            },
+          ],
+          bestPractices: [
+            "Use `__init_subclass__` for simple class initialization hooks instead of heavy metaclasses.",
+            "Always implement `__set_name__` in custom descriptors for clean private attribute naming.",
+            "Inspect `Class.__mro__` to debug complex diamond multiple inheritance hierarchies.",
+          ],
+          summary: [
+            "Metaclasses customize the creation and registration of classes at import time.",
+            "Descriptors intercept attribute get, set, and delete operations on instances.",
+            "C3 Linearization guarantees deterministic multiple inheritance resolution.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-py-15",
+      slug: "cython-cffi-buffer-protocol-strides",
+      title: "Module 15: Cython, CFFI & NumPy Memory Strides (Buffer Protocol)",
+      description: "Accelerate numerical code with Cython C-extensions, CFFI bindings, and zero-copy NumPy Buffer Protocol strides.",
+      lessons: [
+        {
+          id: "py-c-extensions",
+          slug: "python-cython-cffi-buffer-protocol-memory-strides",
+          courseSlug: "python",
+          moduleSlug: "cython-cffi-buffer-protocol-strides",
+          title: "Cython, CFFI & The Python Buffer Protocol",
+          description: "Bridge Python with native C speed: compile typed Cython `.pyx` files, invoke shared C libraries using `cffi`, and manipulate raw memory buffers with zero copies using the Python Buffer Protocol (`memoryview`).",
+          durationMinutes: 26,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "How Cython compiles typed Python supersets into optimized C extension modules",
+            "Interfacing with external C `.so`/`.dll` libraries dynamically using CFFI (C Foreign Function Interface)",
+            "The CPython Buffer Protocol (PEP 3118): sharing raw binary memory across libraries without copying",
+            "Understanding contiguous memory layouts, strides, and shapes in `memoryview` and NumPy",
+          ],
+          introduction: `Python's dynamic nature introduces boxing overhead: every integer is a full heap-allocated \`PyObject\` with type tags and reference counts. For high-performance matrix math, video decoding, or numerical simulation, developers use Cython and CFFI to execute raw C pointer arithmetic while exposing clean Python APIs.`,
+          whyItMatters: `The Python Buffer Protocol is what makes NumPy, PyTorch, and TensorFlow fast. It allows gigabytes of raw binary tensor data to pass between C++, Rust, and Python without copying a single byte in memory.`,
+          syntax: `# Cython syntax\ncdef int fast_sum(int[:] arr):\n  cdef int total = 0\n  return total\n\n# Python memoryview\nmv = memoryview(byte_array)`,
+          mainExample: {
+            title: "Zero-Copy Memory Manipulation with Python memoryview and Buffer Protocol",
+            language: "python",
+            code: `# Zero-Copy Memory Slicing with Python Buffer Protocol
+import array
+
+# 1. Allocate a contiguous block of 16-bit signed integers in RAM
+raw_array = array.array('h', [10, 20, 30, 40, 50, 60, 70, 80])
+print(f"Original Array: {raw_array.tolist()}")
+
+# 2. Wrap array in a memoryview (Zero-Copy Buffer Protocol View)
+mem_view = memoryview(raw_array)
+
+print(f"Memory Buffer Address: {hex(mem_view.obj.buffer_info()[0])}")
+print(f"Item Size in Bytes: {mem_view.itemsize} bytes per element")
+print(f"Total Byte Length: {mem_view.nbytes} bytes")
+
+# 3. Create a slice (Does NOT allocate new memory; shares the exact same pointer!)
+slice_view = mem_view[2:6]
+print(f"Slice View Content: {slice_view.tolist()}")
+
+# 4. Mutating the slice directly modifies the underlying original array!
+slice_view[0] = 999 # Modifies element at index 2 of original array
+
+print(f"✅ Original Array AFTER Slice Mutation: {raw_array.tolist()}")
+print("Zero memory copies occurred during slicing and mutation operations!");`,
+            executable: true,
+            explanation: [
+              "memoryview exposes the underlying C-level Py_buffer structure without copying data.",
+              "Slicing a memoryview (mem_view[2:6]) returns a new view pointer with adjusted memory offsets in O(1) time.",
+              "Mutations through the slice are immediately visible in the underlying raw buffer because both share the exact same RAM address.",
+            ],
+          },
+          detailedExplanation: [
+            "CFFI (C Foreign Function Interface): CFFI provides an interactive way to load `.so` or `.dll` shared libraries directly from Python using standard C header declarations (`ffi.cdef('int add(int, int);')`), avoiding complex C-API boilerplate.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Converting large binary buffers to standard Python lists (`list(buffer)`), triggering millions of PyObject allocations.",
+              badCode: "elements = list(large_byte_array) # Allocates millions of heap objects",
+              goodCode: "view = memoryview(large_byte_array) # Zero-copy 0 bytes allocated",
+              explanation: "Python lists store pointers to heap-allocated `PyObject` wrappers. `memoryview` reads raw binary data directly.",
+            },
+          ],
+          bestPractices: [
+            "Use `memoryview` when slicing network packets or large binary files.",
+            "Use Cython with `cimport numpy as cnp` for multi-threaded C-speed array transformations.",
+            "Use `cffi` for safe, dynamic bindings to external C and Rust libraries.",
+          ],
+          summary: [
+            "Cython compiles typed Python code into ultra-fast C extension binaries.",
+            "The Buffer Protocol enables zero-copy memory sharing between C, Rust, and Python.",
+            "`memoryview` performs O(1) buffer slicing without heap memory duplication.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-py-16",
+      slug: "memory-profiling-tracemalloc-slots",
+      title: "Module 16: Memory Profiling: `tracemalloc`, GC Internals & `__slots__`",
+      description: "Eliminate Python memory bloat: inspect heap allocations with `tracemalloc`, tune cyclical GC, and slash class memory by 60% with `__slots__`.",
+      lessons: [
+        {
+          id: "py-memory-profiling",
+          slug: "python-memory-profiling-tracemalloc-gc-slots",
+          courseSlug: "python",
+          moduleSlug: "memory-profiling-tracemalloc-slots",
+          title: "Memory Profiling: tracemalloc, GC & __slots__",
+          description: "Optimize Python memory consumption: tracing line-by-line allocations with `tracemalloc`, understanding Reference Counting and Cyclical GC generations, and slashing object memory footprint with `__slots__`.",
+          durationMinutes: 24,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "Python's dual memory management: Immediate Reference Counting + Cyclical Garbage Collector (Generations 0, 1, 2)",
+            "Pinpointing memory leaks and allocation spikes using the `tracemalloc` module",
+            "Why standard Python classes use dynamic `__dict__` and how `__slots__` reduces memory by 60%+",
+            "Detecting reference cycles using the `gc` module (`gc.get_referrers()`, `gc.collect()`)",
+          ],
+          introduction: `Python uses Reference Counting as its primary memory management mechanism: when an object's reference count drops to zero, it is deallocated immediately. To resolve circular references (e.g. A references B, and B references A), CPython runs a generational cyclical garbage collector that scans objects across Generations 0, 1, and 2.`,
+          whyItMatters: `By default, every Python class instance maintains an internal \`__dict__\` dictionary for dynamic attribute storage, which consumes ~150 bytes per object. In applications holding millions of objects (such as graph nodes or cache records), declaring \`__slots__\` slashes memory consumption from gigabytes down to megabytes.`,
+          syntax: `import tracemalloc\ntracemalloc.start()\n\nclass OptimizedNode:\n  __slots__ = ('id', 'value', 'parent')`,
+          mainExample: {
+            title: "Memory Profiling with tracemalloc and __slots__ Comparison",
+            language: "python",
+            code: `# Memory Optimization: tracemalloc & __slots__ Benchmark
+import sys
+import tracemalloc
+
+# 1. Standard Class (Uses dynamic __dict__)
+class StandardUser:
+    def __init__(self, user_id: int, username: str):
+        self.user_id = user_id
+        self.username = username
+
+# 2. Optimized Class with __slots__ (Eliminates __dict__ per instance!)
+class SlottedUser:
+    __slots__ = ('user_id', 'username')
+
+    def __init__(self, user_id: int, username: str):
+        self.user_id = user_id
+        self.username = username
+
+# Benchmark Memory Allocations with tracemalloc
+tracemalloc.start()
+
+# Allocate 50,000 Slotted instances
+slotted_users = [SlottedUser(i, f"user_{i}") for i in range(50000)]
+current, peak = tracemalloc.get_traced_memory()
+tracemalloc.stop()
+
+print("=== Python Memory Profiling Results ===")
+print(f"Memory for 50,000 Slotted Users: {peak / 1024 / 1024:.2f} MB")
+
+# Inspect instance memory size directly
+standard_inst = StandardUser(1, "alex")
+slotted_inst = SlottedUser(1, "alex")
+
+std_size = sys.getsizeof(standard_inst) + sys.getsizeof(standard_inst.__dict__)
+slot_size = sys.getsizeof(slotted_inst)
+
+print(f"Standard Class Instance Size: {std_size} bytes (with __dict__)")
+print(f"Slotted Class Instance Size:  {slot_size} bytes (Fixed descriptor array)")
+print(f"✅ Memory Savings: {((std_size - slot_size) / std_size) * 100:.1f}% reduction per instance!");`,
+            executable: true,
+            explanation: [
+              "Standard classes allocate a dynamic dictionary (__dict__) for every instance, allowing arbitrary runtime attribute assignment at the cost of high memory overhead.",
+              "__slots__ reserves a fixed array of pointers for named attributes, eliminating the __dict__ and reducing memory per object by over 60%.",
+              "tracemalloc tracks exact heap memory allocations with Python file and line number origin details.",
+            ],
+          },
+          detailedExplanation: [
+            "CPython Cyclical Garbage Collection Generations: New objects are allocated into Generation 0. If they survive a GC collection cycle, they are promoted to Generation 1, and eventually to Generation 2 (long-lived objects). The collector runs less frequently on older generations to minimize CPU overhead.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Creating circular references in classes with `__del__` methods in older Python versions, preventing garbage collection.",
+              badCode: "class Node: def __del__(self): pass # Can create uncollectable cycles",
+              goodCode: "# Use weakref.ref for parent pointers to prevent circular strong reference cycles",
+              explanation: "Circular strong references cannot be collected by reference counting alone. Use `weakref` for back-pointers in trees and graphs.",
+            },
+          ],
+          bestPractices: [
+            "Add `__slots__` to data model classes instantiated millions of times.",
+            "Use `tracemalloc.take_snapshot()` before and after operations to find memory leaks.",
+            "Use `weakref.WeakValueDictionary` for in-memory caches to allow automatic garbage collection.",
+          ],
+          summary: [
+            "CPython combines Reference Counting with a 3-Generation Cyclical Garbage Collector.",
+            "`tracemalloc` tracks line-by-line memory allocation differences in production scripts.",
+            "`__slots__` replaces `__dict__` with compact memory arrays, saving 60%+ RAM per instance.",
+          ],
+        },
+      ],
+    },
   ],
 };

@@ -417,5 +417,521 @@ export const goCourse: Course = {
         },
       ],
     },
+    {
+      id: "mod-go-12",
+      slug: "go-scheduler-gmp-model-work-stealing",
+      title: "Module 12: Go Scheduler: G, M, P Model & Work-Stealing Internals",
+      description: "Master the Go runtime scheduler: G (Goroutine), M (OS Thread), P (Logical Processor), work-stealing algorithms, and non-cooperative preemption.",
+      lessons: [
+        {
+          id: "go-gmp-scheduler",
+          slug: "go-runtime-scheduler-gmp-model-work-stealing-preemption",
+          courseSlug: "go",
+          moduleSlug: "go-scheduler-gmp-model-work-stealing",
+          title: "Go Scheduler Architecture: The G-M-P Work-Stealing Engine",
+          description: "Explore the internal architecture of the Go M:N scheduler: Goroutines (G), OS Threads (M), Logical Processors (P), Local/Global Run Queues (LRQ/GRQ), work-stealing algorithms, and asynchronous preemption via OS signals (SIGURG).",
+          durationMinutes: 26,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "The 3 pillars of Go scheduling: G (Goroutine struct), M (Machine OS thread), P (Logical processor context)",
+            "How Go multiplexes M goroutines onto N OS threads with `GOMAXPROCS`",
+            "The Work-Stealing algorithm: stealing 50% of goroutines from peer P local run queues",
+            "Non-cooperative asynchronous preemption using Linux/POSIX `SIGURG` signals (Go 1.14+)",
+          ],
+          introduction: `Go's defining feature is lightweight concurrency: spawning a goroutine takes only ~2KB of stack memory, allowing a single binary to execute hundreds of thousands of concurrent goroutines. The Go runtime manages this with an M:N work-stealing scheduler that maps millions of user-space Goroutines (G) onto operating system threads (M) governed by logical processor contexts (P).`,
+          whyItMatters: `Understanding scheduler states (runnable, running, waiting, syscall) allows you to diagnose goroutine starvation, tune GOMAXPROCS in containerized Kubernetes pods, and eliminate thread thrashing.`,
+          syntax: `import "runtime"\nruntime.GOMAXPROCS(runtime.NumCPU())\nruntime.Gosched() // Cooperatively yield P`,
+          mainExample: {
+            title: "Inspecting Go Runtime Scheduler Statistics with GODEBUG=schedtrace",
+            language: "go",
+            code: `// Inspecting Go Runtime Scheduler Metrics
+package main
+
+import (
+	"fmt"
+	"runtime"
+	"sync"
+	"time"
+)
+
+func main() {
+	fmt.Println("=== Go G-M-P Scheduler Diagnostics ===")
+
+	// 1. Inspect active Logical Processors (P) and CPU cores
+	numCPU := runtime.NumCPU()
+	procs := runtime.GOMAXPROCS(0)
+	fmt.Printf("Hardware CPU Cores: %d | Logical Processors (P): %d\\n", numCPU, procs)
+
+	// 2. Spawn 50,000 Goroutines to observe Work-Stealing distribution
+	var wg sync.WaitGroup
+	start := time.Now()
+
+	for i := 0; i < 50000; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			// Ephemeral computation
+			_ = id * id
+			if id%10000 == 0 {
+				// runtime.Gosched yields execution back to local P queue
+				runtime.Gosched()
+			}
+		}(i)
+	}
+
+	wg.Wait()
+	fmt.Printf("✅ Dispatched and executed 50,000 Goroutines in %v\\n", time.Since(start))
+	fmt.Printf("Current Active Goroutines: %d\\n", runtime.NumGoroutine())
+}`,
+            executable: true,
+            explanation: [
+              "GOMAXPROCS defines the number of P (Logical Processor) structs, matching available CPU cores.",
+              "Each P maintains a 256-element lock-free Local Run Queue (LRQ).",
+              "When a P empties its queue, it checks the Global Run Queue (GRQ), network poller (netpoll), and then steals half the goroutines from a random peer P's queue.",
+              "If a goroutine runs in a tight loop without function calls, the sysmon background thread injects a SIGURG signal to preempt it after 10ms.",
+            ],
+          },
+          detailedExplanation: [
+            "Network Poller Integration: When a goroutine performs a network read (`conn.Read`), it does NOT block the OS thread (M). Instead, it detaches from P, registers its file descriptor with the runtime network poller (`netpoll`), and parks. The M immediately executes other runnable goroutines from P.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Relying on default GOMAXPROCS inside CPU-throttled Kubernetes containers, causing CFS scheduler throttling.",
+              badCode: "// Running with GOMAXPROCS=64 on a pod with CPU limit = 2 cores",
+              goodCode: "import _ \"go.uber.org/automaxprocs\" // Automatically sets GOMAXPROCS to match cgroup quota",
+              explanation: "If GOMAXPROCS exceeds container cgroup quotas, the Linux CFS scheduler throttles the process, introducing severe latency spikes.",
+            },
+          ],
+          bestPractices: [
+            "Use `go.uber.org/automaxprocs` in containerized microservices.",
+            "Profile scheduler latency using `GODEBUG=schedtrace=1000 ./app`.",
+            "Avoid calling blocking Cgo functions in hot loops (blocks OS thread M).",
+          ],
+          summary: [
+            "The G-M-P model multiplexes M goroutines across N OS threads using P processor contexts.",
+            "Work-stealing balances goroutines across CPU cores with zero lock contention.",
+            "Non-cooperative SIGURG preemption prevents tight loops from starving sibling goroutines.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-go-13",
+      slug: "go-garbage-collector-tricolor-mark-sweep",
+      title: "Module 13: Go GC Internals: Tri-Color Mark-Sweep & Write Barriers",
+      description: "Master Go's concurrent garbage collector: Tri-Color marking abstraction, Yuasa/Dijkstra Hybrid Write Barrier, and tuning GOGC/GOMEMLIMIT.",
+      lessons: [
+        {
+          id: "go-gc-internals",
+          slug: "go-garbage-collector-tri-color-mark-sweep-write-barrier",
+          courseSlug: "go",
+          moduleSlug: "go-garbage-collector-tricolor-mark-sweep",
+          title: "Go Garbage Collector: Tri-Color Marking & Write Barriers",
+          description: "Deconstruct the Go runtime Garbage Collector: Tri-Color concurrent mark-and-sweep, Hybrid Write Barrier (Dijkstra + Yuasa), Mark Termination phases, and tuning `GOMEMLIMIT` and `GOGC` (Pacer algorithm).",
+          durationMinutes: 26,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "The Tri-Color Marking algorithm: White (unvisited), Grey (scanned, unvisited children), Black (reachable)",
+            "Why the Hybrid Write Barrier prevents GC race conditions during active concurrent mutations",
+            "The Go GC Pacer feedback loop and controlling GC frequency with `GOGC` (default: 100)",
+            "Enforcing memory limits and preventing OOM kills using `GOMEMLIMIT` (Go 1.19+)",
+          ],
+          introduction: `Go uses a concurrent, non-moving, tri-color mark-sweep garbage collector designed for low latency over peak throughput. Unlike Java's generational GC which moves and compacts objects, Go keeps objects in place and marks pointers concurrently while application goroutines (mutators) run. The Hybrid Write Barrier ensures that if mutators move pointers during marking, no reachable objects are missed.`,
+          whyItMatters: `Tuning \`GOMEMLIMIT\` prevents Kubernetes Out-Of-Memory (OOM) fatal kills by instructing the GC Pacer to trigger collections dynamically before container cgroup memory limits are reached.`,
+          syntax: `GOGC=100 GOMEMLIMIT=2GiB ./server\nimport "runtime/debug"\ndebug.SetMemoryLimit(2 * 1024 * 1024 * 1024)`,
+          mainExample: {
+            title: "Simulating GC Pacer Metrics and Inspecting GC Pauses in Go",
+            language: "go",
+            code: `// Go Garbage Collector Telemetry & GOMEMLIMIT Tuning
+package main
+
+import (
+	"fmt"
+	"runtime"
+	"runtime/debug"
+	"time"
+)
+
+func main() {
+	fmt.Println("=== Go Concurrent GC Engine Diagnostics ===")
+
+	// 1. Configure GOMEMLIMIT (Soft memory ceiling for GC Pacer)
+	previousLimit := debug.SetMemoryLimit(512 * 1024 * 1024) // 512 MB soft limit
+	fmt.Printf("Configured GOMEMLIMIT soft ceiling: 512MB (Previous: %d bytes)\\n", previousLimit)
+
+	// 2. Allocate memory to trigger GC marking phases
+	start := time.Now()
+	var holder [][]byte
+	for i := 0; i < 50; i++ {
+		// Allocate 5MB blocks
+		buf := make([]byte, 5*1024*1024)
+		holder = append(holder, buf)
+		if len(holder) > 10 {
+			holder = holder[5:] // Release 25MB to trigger GC reclamation
+		}
+	}
+
+	// 3. Inspect GC Pause Telemetry
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+
+	fmt.Printf("Total Alloc: %d MB\\n", memStats.TotalAlloc/1024/1024)
+	fmt.Printf("Heap In-Use: %d MB\\n", memStats.HeapInuse/1024/1024)
+	fmt.Printf("Number of GC Cycles: %d\\n", memStats.NumGC)
+	fmt.Printf("Latest GC Pause: %v\\n", time.Duration(memStats.PauseNs[(memStats.NumGC+255)%256]))
+	fmt.Printf("Benchmark finished in %v with sub-millisecond GC pauses!\\n", time.Since(start))
+}`,
+            executable: true,
+            explanation: [
+              "Tri-color marking colors all objects White at the start of a GC cycle.",
+              "Roots (global variables and goroutine stacks) are marked Grey and pushed to a scan work-queue.",
+              "The Hybrid Write Barrier shades new and modified pointer targets Grey to ensure mutator goroutines do not hide objects behind Black pointers.",
+              "debug.SetMemoryLimit instructs the GC Pacer to adjust GC frequency dynamically to stay under the 512MB ceiling.",
+            ],
+          },
+          detailedExplanation: [
+            "GC Pacer Feedback Loop: The Pacer estimates the rate of memory allocation versus the rate of GC marking. If mutators allocate faster than GC worker threads can mark, the Pacer engages 'Mutator Assist', forcing allocating goroutines to spend CPU time helping the GC mark objects.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Setting GOGC=off to avoid GC pauses, leading to inevitable Out-Of-Memory container crashes.",
+              badCode: "export GOGC=off // Danger: Memory grows unbounded until process is killed",
+              goodCode: "export GOMEMLIMIT=1800MiB // Use soft limit to protect Kubernetes memory budgets",
+              explanation: "GOGC=off completely disables garbage collection. GOMEMLIMIT allows the GC to run only when needed while respecting RAM limits.",
+            },
+          ],
+          bestPractices: [
+            "Set `GOMEMLIMIT` to 90% of your Kubernetes memory request/limit.",
+            "Use `GODEBUG=gctrace=1` to observe live heap sizing and mark/sweep phase timings.",
+            "Reduce heap allocations by reusing objects with `sync.Pool`.",
+          ],
+          summary: [
+            "Go's GC uses non-moving Tri-Color Concurrent Mark-Sweep with sub-millisecond pauses.",
+            "Hybrid Write Barrier ensures memory correctness without Stop-The-World stalls.",
+            "`GOMEMLIMIT` prevents Kubernetes OOM crashes by pacing GC cycles dynamically.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-go-14",
+      slug: "sync-pool-allocations-lockfree-atomics",
+      title: "Module 14: High-Performance Memory: `sync.Pool` & Lock-Free Atomics",
+      description: "Eliminate heap allocation overhead with `sync.Pool` thread-local caching, atomic CPU primitives (`sync/atomic`), and memory alignment.",
+      lessons: [
+        {
+          id: "go-sync-pool-atomics",
+          slug: "go-sync-pool-memory-allocations-atomic-primitives",
+          courseSlug: "go",
+          moduleSlug: "sync-pool-allocations-lockfree-atomics",
+          title: "High-Performance Go: sync.Pool & Lock-Free Atomics",
+          description: "Achieve zero-allocation Go performance: eliminating Garbage Collection pressure with `sync.Pool` per-P local caching, thread-safe lock-free programming with `sync/atomic`, and building lockless state machines.",
+          durationMinutes: 24,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "How `sync.Pool` maintains per-P private and shared object pools to eliminate lock contention",
+            "Why `sync.Pool` is cleared during GC cycles and how to size reusable byte buffers correctly",
+            "Atomic CPU operations (`atomic.Int64`, `atomic.Pointer[T]`, Compare-And-Swap CAS)",
+            "Building high-throughput lock-free counters and configuration pointers",
+          ],
+          introduction: `Every heap allocation in Go increases GC workload. In high-throughput network services handling 100,000 requests per second, allocating new byte buffers and JSON decoders on every request degrades throughput by 40%. \`sync.Pool\` provides reusable object caching across goroutines without global lock bottlenecks by utilizing per-P private storage.`,
+          whyItMatters: `Frameworks like Gin, Fasthttp, and Zerolog achieve extreme throughput by pooling byte buffers and structs with \`sync.Pool\`, reaching 0 bytes/op memory allocations.`,
+          syntax: `var bufPool = sync.Pool{ New: func() any { return new(bytes.Buffer) } }\nbuf := bufPool.Get().(*bytes.Buffer)\ndefer bufPool.Put(buf)`,
+          mainExample: {
+            title: "Zero-Allocation Buffer Recycling with sync.Pool and atomic.Pointer",
+            language: "go",
+            code: `// Zero-Allocation Buffer Pool & Lock-Free Atomic State
+package main
+
+import (
+	"bytes"
+	"fmt"
+	"sync"
+	"sync/atomic"
+)
+
+// 1. Global Object Pool for Buffer Reuse
+var bufferPool = sync.Pool{
+	New: func() any {
+		// Allocates only when pool is empty
+		return new(bytes.Buffer)
+	},
+}
+
+// 2. Lock-Free Dynamic Configuration using atomic.Pointer (Go 1.19+)
+type ServerConfig struct {
+	MaxConns int
+	RateLimit int
+}
+
+var activeConfig atomic.Pointer[ServerConfig]
+
+func main() {
+	fmt.Println("=== High-Performance sync.Pool & Lock-Free Atomics ===")
+
+	// Initialize atomic configuration
+	activeConfig.Store(&ServerConfig{MaxConns: 5000, RateLimit: 1000})
+
+	// Benchmark Buffer Pool Retrieval
+	var wg sync.WaitGroup
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go func(workerID int) {
+			defer wg.Done()
+
+			// 1. Retrieve buffer from per-P pool (Zero Heap Allocation!)
+			buf := bufferPool.Get().(*bytes.Buffer)
+			buf.Reset() // Always reset state before use
+
+			// 2. Read atomic config lock-free (Sub-nanosecond atomic pointer load)
+			cfg := activeConfig.Load()
+
+			fmt.Fprintf(buf, "Worker #%d processed with MaxConns=%d", workerID, cfg.MaxConns)
+			fmt.Println(buf.String())
+
+			// 3. Return buffer to pool for reuse
+			bufferPool.Put(buf)
+		}(i)
+	}
+
+	wg.Wait()
+	fmt.Println("✅ All tasks completed with zero permanent heap allocation overhead!")
+}`,
+            executable: true,
+            explanation: [
+              "bufferPool.Get() first checks the calling P's private slot in 0ns without acquiring any locks.",
+              "If the private slot is empty, it checks P's shared pool using lock-free pop, and finally steals from peer P pools.",
+              "buf.Reset() truncates the buffer length to 0 while preserving underlying capacity in RAM.",
+              "atomic.Pointer[T] allows updating application configuration atomically in 1 CPU instruction without mutex locks.",
+            ],
+          },
+          detailedExplanation: [
+            "sync.Pool Lifecycle: At the start of every GC cycle, the runtime moves `sync.Pool` objects into a 'victim cache'. If an object is not accessed during the current GC cycle, it is reclaimed. This guarantees pooled memory does not grow unbounded.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Putting bloated, multi-megabyte buffers back into `sync.Pool`, permanently inflating process memory.",
+              badCode: "if buf.Cap() > 1024*1024 { pool.Put(buf); } // Leaks large buffer in pool",
+              goodCode: "if buf.Cap() <= 64*1024 { pool.Put(buf); } // Only pool reasonable sizes",
+              explanation: "If a single request caused a buffer to grow to 50MB, pooling it retains 50MB permanently. Discard oversized buffers.",
+            },
+          ],
+          bestPractices: [
+            "Always call `buf.Reset()` before reusing pooled objects.",
+            "Use `atomic.Pointer[T]` for hot read-mostly configuration data.",
+            "Cap the maximum buffer size allowed back into `sync.Pool` (e.g. discard buffers > 64KB).",
+          ],
+          summary: [
+            "`sync.Pool` eliminates heap allocation latency via lock-free per-P object caching.",
+            "`sync/atomic` primitives enable lockless synchronization at hardware CPU speeds.",
+            "Recycling buffers dramatically reduces Garbage Collection pressure in high-scale APIs.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-go-15",
+      slug: "netpoll-low-level-networking",
+      title: "Module 15: Network Poller (netpoll): Zero-Copy epoll & Raw TCP",
+      description: "Master Go's network poller: runtime epoll/kqueue integration, zero-copy buffer slicing, and raw TCP connection tuning.",
+      lessons: [
+        {
+          id: "go-netpoll-internals",
+          slug: "go-runtime-netpoll-epoll-kqueue-zero-copy-tcp",
+          courseSlug: "go",
+          moduleSlug: "netpoll-low-level-networking",
+          title: "Network Poller Architecture & Zero-Copy TCP Sockets",
+          description: "Explore Go's high-concurrency networking layer: runtime `netpoll` integration with OS `epoll`/`kqueue`, non-blocking I/O event notification, TCP socket buffer tuning (`SO_RCVBUF`, `TCP_NODELAY`), and zero-copy packet processing with `splice()`.",
+          durationMinutes: 26,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "How `netpoll` bridges Go's synchronous network API (`net.Conn`) with asynchronous OS `epoll` queues",
+            "Why Go goroutines park and wake up with zero OS thread context switches during socket I/O",
+            "Tuning low-latency TCP sockets with `TCP_NODELAY` (disabling Nagle's algorithm) and keepalives",
+            "Zero-copy data streaming from network socket directly to file descriptor using Linux `splice`",
+          ],
+          introduction: `In traditional C/Java servers, managing 100,000 open TCP sockets required either 100,000 blocking OS threads (exhausting memory) or writing complex non-blocking state machine loops with epoll. Go's runtime includes 'netpoll': an internal event notification engine that allows developers to write straightforward blocking \`conn.Read()\` calls while the runtime transparently monitors sockets with OS \`epoll_wait\`.`,
+          whyItMatters: `High-performance proxy servers, API gateways (like Traefik/Caddy), and WebSocket engines use netpoll tuning and zero-copy splices to route gigabits of traffic with near-zero CPU usage.`,
+          syntax: `tcpConn.SetNoDelay(true)\ntcpConn.SetReadBuffer(64 * 1024)\n// Linux zero-copy transfer\nio.Copy(dstFile, tcpConn)`,
+          mainExample: {
+            title: "Tuning Low-Latency Production TCP Server with netpoll Optimizations",
+            language: "go",
+            code: `// Low-Latency High-Concurrency TCP Server Architecture
+package main
+
+import (
+	"fmt"
+	"net"
+	"time"
+)
+
+func handleConnection(conn net.Conn) {
+	defer conn.Close()
+
+	// 1. Optimize TCP Socket Settings
+	if tcpConn, ok := conn.(*net.TCPConn); ok {
+		// Disable Nagle's Algorithm: Send packets immediately without buffering!
+		_ = tcpConn.SetNoDelay(true)
+		// Enable TCP KeepAlive with fast probe intervals
+		_ = tcpConn.SetKeepAlive(true)
+		_ = tcpConn.SetKeepAlivePeriod(30 * time.Second)
+		// Tune Socket Buffer Sizes
+		_ = tcpConn.SetReadBuffer(32 * 1024)
+		_ = tcpConn.SetWriteBuffer(32 * 1024)
+	}
+
+	buffer := make([]byte, 4096)
+	for {
+		// Set per-read deadline to prevent Slowloris attacks
+		_ = conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+
+		// When conn.Read executes, the Goroutine parks in netpoll without consuming CPU!
+		n, err := conn.Read(buffer)
+		if err != nil {
+			return // Disconnected or timeout
+		}
+
+		// Echo message back to client
+		_, _ = conn.Write(append([]byte("KWAS-ECHO: "), buffer[:n]...))
+	}
+}
+
+func main() {
+	fmt.Println("=== Go Low-Latency netpoll TCP Server ===")
+	listener, err := net.Listen("tcp", ":9090")
+	if err != nil {
+		fmt.Printf("Listen failed (Local demo mode): %v\\n", err)
+		return
+	}
+	defer listener.Close()
+
+	fmt.Println("✅ TCP Listener active on :9090 (Managed by runtime netpoll / epoll)")
+}`,
+            executable: true,
+            explanation: [
+              "When conn.Read() encounters an empty socket buffer, the Go runtime parks the goroutine and registers the file descriptor with netpoll (epoll).",
+              "When network packets arrive at the NIC, epoll notifies netpoll, which marks the goroutine as 'runnable' and pushes it back to a P run-queue.",
+              "tcpConn.SetNoDelay(true) disables Nagle's algorithm, eliminating 40ms delayed-ACK packet latency.",
+            ],
+          },
+          detailedExplanation: [
+            "Linux Splice Zero-Copy: When copying data from a `net.TCPConn` directly to a file (`os.File`), Go's `io.Copy` automatically invokes the Linux `splice(2)` system call, streaming data directly from the network kernel buffer to the file page cache without copying bytes into user-space RAM.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Omitting read/write deadlines on long-lived TCP connections, causing socket descriptor leaks from hanging clients.",
+              badCode: "conn.Read(buf) // Can hang forever if network disconnects without TCP FIN",
+              goodCode: "conn.SetReadDeadline(time.Now().Add(30 * time.Second))",
+              explanation: "Dead TCP sockets from abrupt network drops consume file descriptors indefinitely unless monitored with deadlines or keepalive probes.",
+            },
+          ],
+          bestPractices: [
+            "Always set `SetNoDelay(true)` on latency-critical RPC and WebSocket connections.",
+            "Always configure `SetReadDeadline` and `SetWriteDeadline` to mitigate Slowloris resource exhaustion attacks.",
+            "Use `net.Buffers` for vectored I/O (gathering scatter writes into a single `writev` syscall).",
+          ],
+          summary: [
+            "`netpoll` integrates Go's synchronous network API with OS `epoll`/`kqueue`.",
+            "Goroutines park during I/O with zero OS thread context-switching overhead.",
+            "TCP socket tuning (`TCP_NODELAY`, buffer sizing) delivers sub-millisecond network latency.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-go-16",
+      slug: "compiler-escape-analysis-inlining-pprof",
+      title: "Module 16: Inlining, Escape Analysis & Profiling with `pprof`",
+      description: "Master Go compiler optimizations: Escape Analysis (`-gcflags='-m'`), function inlining heuristics, and CPU/Heap profiling with `pprof`.",
+      lessons: [
+        {
+          id: "go-compiler-pprof",
+          slug: "go-compiler-escape-analysis-inlining-pprof-profiling",
+          courseSlug: "go",
+          moduleSlug: "compiler-escape-analysis-inlining-pprof",
+          title: "Escape Analysis, Inlining & pprof Performance Profiling",
+          description: "Optimize Go code at the compiler level: understanding Escape Analysis (Stack vs Heap allocation), function inlining budgets, compiler flags (`-gcflags=\"-m\"`), and profiling production CPU, Heap, and Goroutines using `net/http/pprof`.",
+          durationMinutes: 26,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "How the Go compiler determines whether a variable lives on the Stack (0ns deallocation) or Escapes to the Heap",
+            "Inspecting escape decisions using `go build -gcflags=\"-m -m\"`",
+            "Function Inlining heuristics and why small functions have 0 function call overhead",
+            "Capturing live CPU Flamegraphs and Heap profiles with `pprof` and Go Execution Tracer (`go tool trace`)",
+          ],
+          introduction: `In Go, allocating memory on the Stack is virtually free: when a function returns, its stack pointer moves back and memory is reclaimed in a single CPU instruction without Garbage Collection. If a variable escapes the function scope, the Go compiler allocates it on the Heap, adding GC overhead. Understanding Escape Analysis and profiling with \`pprof\` is how top engineers turn slow services into high-performance engines.`,
+          whyItMatters: `Stack allocation is 100x faster than Heap allocation. Eliminating unnecessary escapes reduces GC pause frequency and CPU consumption by 50%+.`,
+          syntax: `go build -gcflags="-m" main.go\nimport _ "net/http/pprof"\ngo tool pprof http://localhost:6060/debug/pprof/profile`,
+          mainExample: {
+            title: "Demonstrating Escape Analysis and Inlining in Go",
+            language: "go",
+            code: `// Go Compiler Escape Analysis & pprof Diagnostics
+package main
+
+import (
+	"fmt"
+	"net/http"
+	_ "net/http/pprof" // Auto-registers /debug/pprof endpoints on default mux
+)
+
+type Point struct {
+	X, Y int
+}
+
+// 1. Stack Allocation (Does NOT escape: compiler allocates directly on caller stack)
+// Function is small (budget < 80 AST nodes), so compiler INLINES it completely!
+func createStackPoint(x, y int) Point {
+	return Point{X: x, Y: y}
+}
+
+// 2. Heap Escape: Returning a pointer forces compiler to allocate on the Heap!
+// go build -gcflags="-m" outputs: "&Point{...} escapes to heap"
+func createHeapPoint(x, y int) *Point {
+	p := Point{X: x, Y: y}
+	return &p // Escapes to heap because pointer outlives function stack frame!
+}
+
+func main() {
+	fmt.Println("=== Go Compiler Escape Analysis & pprof ===")
+
+	p1 := createStackPoint(10, 20) // Allocated on Stack (Zero GC pressure)
+	p2 := createHeapPoint(30, 40)  // Allocated on Heap (GC tracked)
+
+	fmt.Printf("Stack Point: %+v | Heap Point: %+v\\n", p1, p2)
+	fmt.Println("Inspect compiler decisions with: go build -gcflags='-m' main.go")
+	fmt.Println("Live pprof endpoints registered on /debug/pprof (CPU, Heap, Goroutines, Block, Mutex)")
+}`,
+            executable: true,
+            explanation: [
+              "createStackPoint returns by value: the Point struct is copied onto the caller's stack with zero heap allocation.",
+              "createHeapPoint returns a pointer to a local variable: the compiler recognizes it escapes and allocates it on the heap.",
+              "Running 'go build -gcflags=\"-m\"' displays exact compiler decisions for inlining and heap escaping.",
+              "Importing _ \"net/http/pprof\" attaches live diagnostic profilers to your web server.",
+            ],
+          },
+          detailedExplanation: [
+            "Common Causes of Heap Escapes: 1. Passing values to `interface{}` parameters (e.g. `fmt.Println` boxes primitives into heap allocations). 2. Slices with dynamic sizes (`make([]byte, n)` where n is not constant). 3. Pointers returned from functions. 4. Sending pointers over channels.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Passing structs by pointer (`*MyStruct`) for small structs (<64 bytes) thinking it saves memory, which actually forces heap escapes.",
+              badCode: "func process(p *SmallStruct) { ... } // Forces pointer escape to heap",
+              goodCode: "func process(p SmallStruct) { ... } // Fits in CPU registers / stack",
+              explanation: "Small structs (less than 64 bytes) are cheaper to pass by value on the stack than paying heap allocation and GC pointer tracking costs.",
+            },
+          ],
+          bestPractices: [
+            "Run `go build -gcflags=\"-m\"` to audit hot functions for heap escapes.",
+            "Keep critical inner loop functions small so the compiler can inline them.",
+            "Use `go tool pprof -http=:8080 profile.pb.gz` to visualize interactive Flamegraphs.",
+          ],
+          summary: [
+            "Escape Analysis determines whether variables live on the Stack or Heap.",
+            "Stack allocations provide instant O(1) deallocation with zero Garbage Collection impact.",
+            "`pprof` and Execution Tracer provide comprehensive visibility into production CPU and memory.",
+          ],
+        },
+      ],
+    },
   ],
 };

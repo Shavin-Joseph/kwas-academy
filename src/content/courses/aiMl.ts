@@ -415,5 +415,519 @@ export const aiMlCourse: Course = {
         },
       ],
     },
+    {
+      id: "mod-ai-12",
+      slug: "transformer-architecture-flashattention-rope",
+      title: "Module 12: Transformer Architecture: FlashAttention, RoPE & MQA",
+      description: "Master cutting-edge Transformer architecture: FlashAttention-2 IO-awareness, Rotary Position Embeddings (RoPE), and Grouped-Query Attention (GQA).",
+      lessons: [
+        {
+          id: "ai-flashattention-rope",
+          slug: "transformer-architecture-flashattention-rope-grouped-query-attention",
+          courseSlug: "ai-ml",
+          moduleSlug: "transformer-architecture-flashattention-rope",
+          title: "Transformer Architecture: FlashAttention & RoPE",
+          description: "Deconstruct the core mathematical engines of modern frontier LLMs (Llama 3, GPT-4, Mistral): standard Attention O(N²) memory bottlenecks, FlashAttention-2 tiled GPU SRAM computation, Rotary Position Embeddings (RoPE), and Multi-Query / Grouped-Query Attention (GQA) for reducing KV-Cache memory footprints.",
+          durationMinutes: 28,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "Why standard Multi-Head Attention (MHA) creates an O(N²) memory bottleneck across High Bandwidth Memory (HBM)",
+            "The FlashAttention tiling algorithm: computing exact softmax attention in fast on-chip GPU SRAM",
+            "Rotary Position Embeddings (RoPE): encoding token distance geometrically through complex 2D vector rotations",
+            "Grouped-Query Attention (GQA): sharing Key-Value heads to reduce KV cache memory by up to 8x during inference",
+          ],
+          introduction: `Standard self-attention computes an N x N attention matrix (\`Softmax(Q * K^T / sqrt(d)) * V\`), which requires storing billions of intermediate activations in slow GPU High Bandwidth Memory (HBM), choking memory bandwidth on long contexts. FlashAttention (Tri Dao et al.) reorganizes the attention computation into tiles that fit entirely inside fast on-chip GPU SRAM (19 TB/s bandwidth), calculating mathematically exact attention with zero memory materialization and 3x-5x speedups.`,
+          whyItMatters: `Scaling context windows from 4K to 128K and 1M tokens in modern LLMs (Llama 3, Claude 3.5, Gemini 1.5) was made possible by FlashAttention, RoPE, and Grouped-Query Attention.`,
+          syntax: `// FlashAttention Concept\nTile Q, K, V into SRAM blocks -> compute online softmax accumulator -> write Output directly to HBM`,
+          mainExample: {
+            title: "Simulating Rotary Position Embedding (RoPE) 2D Complex Vector Rotation in Python",
+            language: "python",
+            code: `# Rotary Position Embedding (RoPE) Geometric Formulation
+import numpy as np
+
+def apply_rotary_pos_emb(x, position, dim):
+    """
+    Applies RoPE to a token embedding vector at a specific sequence position.
+    Rotates pairs of features [x0, x1] by angle theta * position in complex plane.
+    """
+    # 1. Compute inverse frequency bands (theta_i = 10000^(-2(i-1)/dim))
+    inv_freq = 1.0 / (10000 ** (np.arange(0, dim, 2) / dim))
+    
+    # 2. Compute position rotation angles
+    sinusoid_inp = position * inv_freq
+    sin = np.sin(sinusoid_inp)
+    cos = np.cos(sinusoid_inp)
+    
+    # 3. Rotate 2D vector coordinates: [x0, x1] -> [x0*cos - x1*sin, x0*sin + x1*cos]
+    x_rotated = np.zeros_like(x)
+    for i in range(0, dim, 2):
+        x0, x1 = x[i], x[i + 1]
+        c, s = cos[i // 2], sin[i // 2]
+        x_rotated[i]     = x0 * c - x1 * s
+        x_rotated[i + 1] = x0 * s + x1 * c
+        
+    return x_rotated
+
+# Token 1 at Position 0 vs Token 2 at Position 5
+dim = 8
+token_vec_a = np.array([1.0, 0.0, 0.5, 0.2, 0.1, 0.9, 0.4, 0.3])
+token_vec_b = np.array([0.8, 0.2, 0.4, 0.1, 0.2, 0.7, 0.3, 0.5])
+
+pos_a = apply_rotary_pos_emb(token_vec_a, position=0, dim=dim)
+pos_b = apply_rotary_pos_emb(token_vec_b, position=5, dim=dim)
+
+print("=== Rotary Position Embedding (RoPE) Engine ===")
+print("Original Vector A: ", token_vec_a[:4])
+print("RoPE Rotated Pos 0:", pos_a[:4])
+print("RoPE Rotated Pos 5:", pos_b[:4])
+print("✅ RoPE encodes relative token distances purely via dot product rotations!")`,
+            executable: true,
+            explanation: [
+              "RoPE encodes position by rotating pairs of embedding dimensions in 2D planes.",
+              "The dot product of two RoPE-rotated vectors depends strictly on their relative distance (pos_b - pos_a), not absolute positions.",
+              "Enables seamless extrapolation to longer context windows via RoPE frequency scaling (YaRN, NTK-aware scaling).",
+              "Grouped-Query Attention (GQA) assigns 8 Query heads to 1 shared Key/Value head, slashing KV-cache RAM by 87.5%.",
+            ],
+          },
+          detailedExplanation: [
+            "Online Softmax Trick: FlashAttention avoids materializing the full N x N attention matrix by maintaining running max and normalization sums across SRAM tiles, computing the exact mathematical softmax incrementally in O(1) extra memory.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Using standard PyTorch `torch.matmul(Q, K.T)` on long sequences (32K+ tokens), causing CUDA Out-of-Memory (OOM) crashes.",
+              badCode: "attn = torch.softmax(q @ k.T / math.sqrt(d), dim=-1) @ v # Allocates huge N x N matrix in HBM!",
+              goodCode: "out = torch.nn.functional.scaled_dot_product_attention(q, k, v) # Uses FlashAttention-2 backend automatically",
+              explanation: "PyTorch's built-in `scaled_dot_product_attention` automatically invokes FlashAttention C++/CUDA kernels, saving gigabytes of GPU VRAM.",
+            },
+          ],
+          bestPractices: [
+            "Use `torch.nn.functional.scaled_dot_product_attention` (SDPA) for hardware-accelerated FlashAttention.",
+            "Adopt Grouped-Query Attention (GQA) when training custom LLMs for high inference throughput.",
+            "Apply YaRN (Yet another RoPE extensioN) when extending pretrained LLM context lengths.",
+          ],
+          summary: [
+            "FlashAttention calculates exact attention in GPU SRAM, bypassing HBM memory bandwidth limits.",
+            "RoPE encodes positional information geometrically through 2D coordinate rotations.",
+            "Grouped-Query Attention (GQA) dramatically reduces KV-cache memory footprints for long-context generation.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-ai-13",
+      slug: "llm-quantization-peft-qlora",
+      title: "Module 13: LLM Quantization & Parameter-Efficient Fine-Tuning",
+      description: "Master LLM compression and fine-tuning: GPTQ, AWQ, 4-bit NormalFloat (NF4), LoRA (Low-Rank Adaptation), and QLoRA.",
+      lessons: [
+        {
+          id: "ai-quantization-qlora",
+          slug: "llm-quantization-gptq-awq-peft-lora-qlora-bitsandbytes",
+          courseSlug: "ai-ml",
+          moduleSlug: "llm-quantization-peft-qlora",
+          title: "LLM Compression: Quantization (GPTQ, AWQ) & QLoRA",
+          description: "Run and fine-tune 70B parameter models on consumer GPUs: Weight-Only Quantization (INT8, INT4, AWQ, GPTQ), Post-Training Quantization (PTQ), Low-Rank Adaptation (LoRA rank r matrices: W = W0 + B*A), and QLoRA with 4-bit NormalFloat (NF4) and Double Quantization.",
+          durationMinutes: 28,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "The memory requirements of LLMs: FP16 (2 bytes/param) vs INT4 (0.5 bytes/param)",
+            "Activation-aware Weight Quantization (AWQ) vs One-Shot GPTQ second-order Hessian optimization",
+            "The mathematical decomposition of LoRA: freezing base weights W0 and training low-rank adapter matrices B (d x r) and A (r x k)",
+            "Fine-tuning a 70-Billion parameter model on a single 48GB GPU using QLoRA and `bitsandbytes`",
+          ],
+          introduction: `A 70-Billion parameter LLM in FP16 precision requires 140GB of GPU VRAM just to load weights, plus an additional 400GB for optimizer states during full fine-tuning. Parameter-Efficient Fine-Tuning (PEFT) via LoRA freezes the original weights and injects small trainable rank decomposition matrices (training only 0.1% of parameters). QLoRA quantizes the base model down to 4-bit NormalFloat (NF4), enabling fine-tuning of 70B models on a single workstation GPU with zero performance degradation.`,
+          whyItMatters: `QLoRA reduces enterprise LLM fine-tuning cloud costs by over 90%, allowing specialized domain models to be trained for medical, legal, and engineering tasks on modest hardware.`,
+          syntax: `// LoRA Forward Pass\nh = W0 * x + (alpha / r) * (B * A * x)`,
+          mainExample: {
+            title: "Configuring 4-bit QLoRA Parameter-Efficient Fine-Tuning in Python",
+            language: "python",
+            code: `# 4-Bit QLoRA Fine-Tuning Pipeline with HuggingFace PEFT & BitsAndBytes
+import torch
+
+# Conceptual LoRA Matrix Layer Implementation
+class LoRALinearLayer(torch.nn.Module):
+    def __init__(self, in_features, out_features, rank=16, alpha=32):
+        super().__init__()
+        # 1. Base Pretrained Weight (Frozen in 4-bit precision!)
+        self.base_weight = torch.nn.Parameter(
+            torch.randn(out_features, in_features), requires_grad=False
+        )
+        # 2. Low-Rank Adapter Matrices: A (r x k) and B (d x r)
+        self.lora_A = torch.nn.Parameter(torch.randn(rank, in_features) * 0.01) # Small Gaussian
+        self.lora_B = torch.nn.Parameter(torch.zeros(out_features, rank))       # Initialized to ZERO!
+        self.scaling = alpha / rank
+
+    def forward(self, x):
+        # Base forward pass (Frozen)
+        base_out = torch.matmul(x, self.base_weight.t())
+        # LoRA Delta forward pass: delta_W = (B * A) * x * scaling
+        lora_out = torch.matmul(x, self.lora_A.t())
+        lora_out = torch.matmul(lora_out, self.lora_B.t()) * self.scaling
+        return base_out + lora_out
+
+# Test LoRA Layer
+in_dim, out_dim, r = 4096, 4096, 16
+lora_layer = LoRALinearLayer(in_dim, out_dim, rank=r)
+
+# Count Trainable Parameters
+trainable = sum(p.numel() for p in lora_layer.parameters() if p.requires_grad)
+frozen = sum(p.numel() for p in lora_layer.parameters() if not p.requires_grad)
+
+print("=== QLoRA Parameter-Efficient Fine-Tuning Engine ===")
+print(f"Frozen Base Parameters:    {frozen:,} (Kept in 4-bit INT4 VRAM)")
+print(f"Trainable LoRA Parameters: {trainable:,} (Only {trainable/frozen*100:.2f}% of model!)")
+print("✅ Gradients computed strictly for tiny low-rank adapter matrices!")`,
+            executable: true,
+            explanation: [
+              "LoRA freezes the billion-parameter base weight W0 and trains only low-rank matrices A and B.",
+              "Matrix B is initialized to all zeros: at step 0, delta_W is exactly zero, perfectly preserving the base model's pretrained capabilities.",
+              "Because rank r=16 is tiny compared to hidden dimension d=4096, trainable parameters drop by 99.8%.",
+              "At inference time, adapter weights B*A can be mathematically merged directly into W0 with zero latency overhead.",
+            ],
+          },
+          detailedExplanation: [
+            "AWQ vs GPTQ Quantization: GPTQ calibrates weights by inverting second-order Hessian error matrices. AWQ (Activation-aware Weight Quantization) observes that preserving the top 1% of 'salient weights' (weights that multiply with high-magnitude activation channels) retains 99.9% of model reasoning accuracy in 4-bit precision.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Performing full fine-tuning (updating all 70B weights) without gradient checkpointing, causing instant CUDA out-of-memory errors.",
+              badCode: "model.train() # Updating all weights requires 16 bytes per param for AdamW optimizer states!",
+              goodCode: "model = get_peft_model(model, LoraConfig(r=16, lora_alpha=32, target_modules=['q_proj', 'v_proj']))",
+              explanation: "Full fine-tuning requires 16 bytes per parameter just for Adam optimizer states (momentum + variance). LoRA requires optimizer states only for tiny adapter matrices.",
+            },
+          ],
+          bestPractices: [
+            "Use AWQ (`AutoAWQ`) or GPTQ (`AutoGPTQ`) for 4-bit production inference deployment.",
+            "Apply QLoRA with `bitsandbytes` 4-bit NormalFloat (NF4) for parameter-efficient domain fine-tuning.",
+            "Merge LoRA adapter weights (`model.merge_and_unload()`) before deploying to production inference servers.",
+          ],
+          summary: [
+            "Quantization compresses weights from FP16 (16-bit) to INT4 (4-bit), slashing VRAM by 75%.",
+            "LoRA freezes base weights and trains rank decomposition matrices A and B.",
+            "QLoRA enables enterprise-scale model fine-tuning on accessible commodity GPUs.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-ai-14",
+      slug: "vector-databases-hnsw-ivf-pq",
+      title: "Module 14: Vector Databases: HNSW & IVF-PQ Indexing",
+      description: "Master vector search engine internals: Hierarchical Navigable Small World (HNSW), Inverted File Product Quantization (IVF-PQ), and cosine similarity.",
+      lessons: [
+        {
+          id: "ai-vector-hnsw",
+          slug: "vector-databases-hnsw-hierarchical-navigable-small-world-ivf-pq",
+          courseSlug: "ai-ml",
+          moduleSlug: "vector-databases-hnsw-ivf-pq",
+          title: "Vector Database Internals: HNSW & IVF-PQ Indexing",
+          description: "Deconstruct production Vector Databases (Milvus, Pinecone, Qdrant, pgvector): Approximate Nearest Neighbor (ANN) search, Hierarchical Navigable Small World (HNSW multi-layer graphs), Product Quantization (PQ sub-vector compression), and SIMD-accelerated distance metrics.",
+          durationMinutes: 28,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "Why brute-force Exact Nearest Neighbor (kNN) search O(N * D) fails on millions of high-dimensional embeddings",
+            "The Hierarchical Navigable Small World (HNSW) graph: multi-layer skip-list inspired graph navigation in O(log N)",
+            "Inverted File Index with Product Quantization (IVF-PQ): compressing 1536-dimensional vectors by 95%",
+            "Filtering with vector payload metadata: Pre-filtering vs Post-filtering vs Single-Stage HNSW Filter Graphs",
+          ],
+          introduction: `Generating 1536-dimensional OpenAI embeddings is only the first step. When a database contains 10,000,000 document vectors, calculating exact Euclidean distance or Cosine Similarity across every vector takes several seconds per query. Vector databases achieve sub-millisecond retrieval across billions of vectors using Approximate Nearest Neighbor (ANN) data structures, primarily Hierarchical Navigable Small World (HNSW) graphs.`,
+          whyItMatters: `High-scale RAG systems, visual search engines, and recommendation systems (Spotify, Pinterest) serve real-time semantic queries in under 5ms using HNSW and IVF-PQ indexing.`,
+          syntax: `// pgvector HNSW Index Creation\nCREATE INDEX ON document_embeddings \nUSING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);`,
+          mainExample: {
+            title: "Simulating HNSW Multi-Layer Graph Skip-Navigation in Python",
+            language: "python",
+            code: `# Hierarchical Navigable Small World (HNSW) Conceptual Graph Navigation
+import numpy as np
+
+class HNSWLayerNode:
+    def __init__(self, vector_id, vector):
+        self.id = vector_id
+        self.vector = vector
+        self.neighbors = [] # Connected edge pointers
+
+def cosine_similarity(v1, v2):
+    return np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2) + 1e-9)
+
+class SimpleHNSW:
+    def __init__(self):
+        # Layer 1 (Top sparse layer: long skips) and Layer 0 (Bottom dense layer: exact local search)
+        self.layer1_nodes = []
+        self.layer0_nodes = []
+
+    def search_layer(self, query_vec, entry_node, candidate_pool_size=4):
+        """Greedy graph search on a single layer: Move to closest neighbor until local minima."""
+        current = entry_node
+        best_sim = cosine_similarity(query_vec, current.vector)
+
+        while True:
+            improved = False
+            for neighbor in current.neighbors:
+                sim = cosine_similarity(query_vec, neighbor.vector)
+                if sim > best_sim:
+                    best_sim = sim
+                    current = neighbor
+                    improved = True
+            if not improved:
+                break # Local maximum similarity reached on this layer!
+        return current, best_sim
+
+# Create simulated nodes
+node_a = HNSWLayerNode("Doc_Tech", np.array([0.9, 0.1, 0.2]))
+node_b = HNSWLayerNode("Doc_Science", np.array([0.8, 0.3, 0.1]))
+node_c = HNSWLayerNode("Doc_Cooking", np.array([0.1, 0.9, 0.8]))
+
+node_a.neighbors = [node_b]
+node_b.neighbors = [node_a, node_c]
+node_c.neighbors = [node_b]
+
+hnsw = SimpleHNSW()
+query = np.array([0.95, 0.05, 0.15]) # Search query close to Tech
+
+best_match, score = hnsw.search_layer(query, entry_node=node_c) # Start from distant entry node
+
+print("=== HNSW Vector Database Search Engine ===")
+print(f"Top Semantic Match: {best_match.id} (Cosine Similarity: {score:.4f})")
+print("✅ Graph navigated via Small-World links to target in logarithmic O(log N) hops!")`,
+            executable: true,
+            explanation: [
+              "HNSW creates a hierarchy of proximity graphs similar to a probabilistic Skip List.",
+              "Top layers contain sparse nodes with long-distance links for rapid coarse-grained exploration.",
+              "Bottom layer (Layer 0) contains all vectors with short-distance links for fine-grained local convergence.",
+              "Search descends from top to bottom, finding nearest neighbors in O(log N) steps instead of O(N).",
+            ],
+          },
+          detailedExplanation: [
+            "Product Quantization (PQ): A 1536-dimension float32 vector consumes 6,144 bytes of RAM. Product Quantization splits the vector into 64 sub-vectors of 24 dimensions, clusters each sub-vector into 256 centroids (1 byte codebook index), compressing the vector from 6KB down to 64 bytes (99% RAM savings) with hardware AVX SIMD asymmetric distance lookup.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Filtering vector search queries using naive post-filtering (fetching top 10 vectors then filtering by user ID), returning 0 results if all 10 belong to other users.",
+              badCode: "// Step 1: kNN search top 10 -> Step 2: filter(user_id == '123') -> Empty list!",
+              goodCode: "// Use Single-Stage Iterative HNSW Filtering (Qdrant / Milvus) to traverse filtered graph edges",
+              explanation: "Post-filtering suffers from severe recall collapse. Always use vector databases that support single-stage filtered graph traversal.",
+            },
+          ],
+          bestPractices: [
+            "Tune HNSW parameters: `M = 16-32` (connections per node) and `ef_construction = 64-128` (build index accuracy).",
+            "Use Product Quantization (IVF-PQ) when indexing datasets exceeding 50,000,000 vectors on limited RAM.",
+            "Normalize vectors to unit length during ingestion to turn Dot Product into fast Cosine Similarity.",
+          ],
+          summary: [
+            "HNSW constructs multi-layer proximity graphs for sub-millisecond O(log N) vector retrieval.",
+            "Product Quantization (PQ) compresses multi-dimensional vectors by up to 95%.",
+            "Single-stage filtered traversal prevents recall degradation in multi-tenant RAG applications.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-ai-15",
+      slug: "agentic-ai-tool-calling-react-swarms",
+      title: "Module 15: Agentic AI Systems: Tool Calling, ReAct & Multi-Agent Swarms",
+      description: "Master autonomous Agentic AI: JSON Schema Tool Calling, ReAct (Reason + Act) loops, Plan-and-Solve, and Multi-Agent collaborative swarms.",
+      lessons: [
+        {
+          id: "ai-agentic-systems",
+          slug: "agentic-ai-tool-calling-react-multi-agent-swarms-langgraph",
+          courseSlug: "ai-ml",
+          moduleSlug: "agentic-ai-tool-calling-react-swarms",
+          title: "Agentic AI: Tool Calling, ReAct & Multi-Agent Swarms",
+          description: "Build production autonomous AI agents: Function / Tool Calling with strict JSON schema validation, ReAct cognitive loops (Thought -> Action -> Observation), Plan-and-Solve architectures, handling tool errors and retries, and multi-agent delegation swarms.",
+          durationMinutes: 28,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "The shift from static chatbot generation to autonomous Agentic loops with environment feedback",
+            "The ReAct Pattern: structured Thought (Reasoning), Action (Tool Invocation), and Observation (Tool Output)",
+            "Enforcing deterministic structured tool calling with JSON Schema specifications",
+            "Multi-Agent architectures: Orchestrator-Workers, Hierarchical Supervisor, and Peer Collaboration",
+          ],
+          introduction: `Traditional LLMs are passive text generators: given a prompt, they output a single response based solely on static training weights. Agentic AI transforms LLMs into autonomous decision-makers capable of interacting with external tools (SQL databases, web browsers, bash terminals, APIs), evaluating observation results, recovering from runtime errors, and executing multi-step workflows until a complex goal is completed.`,
+          whyItMatters: `Autonomous software engineering agents, automated financial research analysts, and customer support copilots rely on ReAct tool loops and multi-agent coordination.`,
+          syntax: `// OpenAI Tool Definition\n{\n  type: "function",\n  function: { name: "query_database", parameters: { ... } }\n}`,
+          mainExample: {
+            title: "Simulating an Autonomous ReAct Agent Loop with Dynamic Tool Execution",
+            language: "python",
+            code: `# Autonomous ReAct (Reason + Act + Observe) Agent Engine in Python
+import json
+
+# 1. Registered External Tools
+def execute_sql_query(query: str) -> str:
+    print(f"  [TOOL RUN] Executing SQL: {query}")
+    if "users" in query.lower():
+        return json.dumps([{"id": 101, "name": "Alice", "plan": "Enterprise"}])
+    return json.dumps([])
+
+def calculate_discount(plan: str) -> str:
+    print(f"  [TOOL RUN] Calculating discount for: {plan}")
+    if plan == "Enterprise": return "30% off annual billing"
+    return "10% standard discount"
+
+TOOLS = {
+    "execute_sql_query": execute_sql_query,
+    "calculate_discount": calculate_discount
+}
+
+# 2. Autonomous Agent Execution Loop
+class AutonomousReActAgent:
+    def __init__(self):
+        self.memory = []
+
+    def step(self, user_goal):
+        print(f"=== Autonomous Agent Goal: '{user_goal}' ===")
+        
+        # Step 1: Reasoning & Tool Decision
+        print("🤔 [THOUGHT] User needs Alice's plan details first. I must query the SQL database.")
+        action = {"tool": "execute_sql_query", "args": {"query": "SELECT plan FROM users WHERE name = 'Alice'"}}
+        print(f"🛠️ [ACTION] Invoking tool '{action['tool']}'...")
+        
+        # Step 2: Tool Execution & Observation
+        obs_1 = TOOLS[action["tool"]](**action["args"])
+        print(f"👁️ [OBSERVATION] Result: {obs_1}")
+        
+        # Step 3: Second Cognitive Loop
+        user_data = json.loads(obs_1)[0]
+        print(f"🤔 [THOUGHT] Alice is on '{user_data['plan']}' plan. Now I will calculate her eligible discount.")
+        action_2 = {"tool": "calculate_discount", "args": {"plan": user_data["plan"]}}
+        print(f"🛠️ [ACTION] Invoking tool '{action_2['tool']}'...")
+        
+        obs_2 = TOOLS[action_2["tool"]](**action_2["args"])
+        print(f"👁️ [OBSERVATION] Result: {obs_2}")
+        
+        # Step 4: Final Synthesized Answer
+        final_answer = f"Alice (User ID: {user_data['id']}) is on the {user_data['plan']} plan and is entitled to {obs_2}."
+        print(f"\\n🎯 [FINAL ANSWER]: {final_answer}")
+        return final_answer
+
+agent = AutonomousReActAgent()
+agent.step("Find Alice's subscription plan and calculate her discount.")
+print("✅ Agent loop autonomously solved multi-step goal with tool orchestration!")`,
+            executable: true,
+            explanation: [
+              "The ReAct loop iterates through Thought -> Action -> Observation cycles until the task is complete.",
+              "Tools are defined with JSON Schemas, allowing the LLM to output structured arguments.",
+              "Observations from tool executions are fed back into the LLM's context as environment feedback.",
+              "If a tool errors (e.g. invalid SQL syntax), the agent observes the stack trace and self-corrects the query.",
+            ],
+          },
+          detailedExplanation: [
+            "Multi-Agent Swarms & LangGraph: In complex multi-agent workflows, a Supervisor agent acts as a project manager, delegating tasks to specialized subagents (e.g. Coder Agent, Security Reviewer Agent, QA Test Runner Agent), aggregating outputs into a unified final pull request.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Allowing agents to run recursive tool loops without a maximum iteration ceiling (`max_iterations = 10`), causing infinite API cost loops on ambiguous tasks.",
+              badCode: "while True: agent.step() // Infinite loop risk!",
+              goodCode: "for i in range(MAX_STEPS): if agent.is_done(): break",
+              explanation: "Always enforce strict `max_steps` and timeout budgets on autonomous agent loops.",
+            },
+          ],
+          bestPractices: [
+            "Enforce strict JSON schema validation on all tool parameter outputs.",
+            "Implement human-in-the-loop (HITL) checkpoints before executing destructive actions (e.g. DB writes, sending emails).",
+            "Use LangGraph or AutoGen for stateful cyclic multi-agent graph workflows.",
+          ],
+          summary: [
+            "Agentic AI empowers LLMs to execute external tools and adapt to environment feedback.",
+            "ReAct cognitive loops alternate between Reasoning, Action, and Observation.",
+            "Multi-Agent swarms divide complex engineering problems among specialized autonomous agents.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-ai-16",
+      slug: "llm-serving-vllm-pagedattention-speculative",
+      title: "Module 16: High-Throughput LLM Serving: vLLM & PagedAttention",
+      description: "Master high-throughput LLM deployment: vLLM inference engine, PagedAttention virtual memory, Continuous Batching, and Speculative Decoding.",
+      lessons: [
+        {
+          id: "ai-vllm-serving",
+          slug: "high-throughput-llm-serving-vllm-pagedattention-speculative-decoding",
+          courseSlug: "ai-ml",
+          moduleSlug: "llm-serving-vllm-pagedattention-speculative",
+          title: "LLM Serving: vLLM, PagedAttention & Speculative Decoding",
+          description: "Deploy large language models at scale with peak hardware utilization: the vLLM engine, PagedAttention virtual memory management for Key-Value caches (eliminating 96% memory fragmentation), Continuous / Iteration-Level Batching, and Speculative Decoding with draft models.",
+          durationMinutes: 28,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "The memory crisis of LLM inference: Why the KV-Cache grows dynamically and exhausts GPU VRAM",
+            "PagedAttention: Managing KV-Cache memory like operating system Virtual Memory pages",
+            "Continuous Batching (Orca / vLLM): Dynamically inserting new requests into running iteration batches",
+            "Speculative Decoding: Using a tiny draft model (e.g. 1B) to generate tokens verified in parallel by a 70B model for 2x-3x speedups",
+          ],
+          introduction: `During LLM generation, storing the Key and Value vectors (KV-Cache) for each token consumes massive amounts of GPU memory. Traditional inference frameworks allocate contiguous memory blocks based on the maximum possible context length (e.g. 8192 tokens), wasting 60-80% of GPU RAM due to internal fragmentation. PagedAttention (vLLM) manages the KV-Cache using non-contiguous virtual memory pages, enabling near-zero memory waste and 2x-4x higher request throughput.`,
+          whyItMatters: `Serving models like Llama 3 or DeepSeek at scale with vLLM, TensorRT-LLM, and Speculative Decoding slashes cloud GPU hosting bills by 70% while halving user response latency.`,
+          syntax: `// Starting vLLM Production Server\nvllm serve meta-llama/Meta-Llama-3-70B-Instruct --tensor-parallel-size 4 --enable-prefix-caching`,
+          mainExample: {
+            title: "Simulating Speculative Decoding with Draft and Target Models in Python",
+            language: "python",
+            code: `# Speculative Decoding Acceleration Engine Simulation
+import numpy as np
+
+def simulate_speculative_decoding(prompt_tokens, draft_k=4):
+    """
+    Speculative Decoding:
+    1. A fast, small Draft Model (1B) generates K candidate tokens cheaply.
+    2. The large Target Model (70B) evaluates all K tokens in a single parallel forward pass!
+    3. Accept matching tokens and reject from the first mismatch.
+    """
+    print(f"=== Speculative Decoding Acceleration (Draft Window K={draft_k}) ===")
+    
+    # Simulated true target token distribution probabilities vs draft predictions
+    # 70B Model target: [101, 204, 305, 408]
+    target_tokens = [101, 204, 305, 408]
+    # 1B Draft model guesses: [101, 204, 999, 408] (Mismatch at index 2)
+    draft_tokens  = [101, 204, 999, 408]
+    
+    accepted_tokens = []
+    print(f"1. Draft Model (1B) guessed {draft_k} tokens in 4ms: {draft_tokens}")
+    print("2. Target Model (70B) verifies all tokens in a SINGLE parallel forward pass (15ms)...")
+    
+    for i in range(draft_k):
+        if draft_tokens[i] == target_tokens[i]:
+            accepted_tokens.append(draft_tokens[i])
+            print(f"   Token {i+1} ({draft_tokens[i]}): ✅ ACCEPTED")
+        else:
+            # First mismatch: Reject remaining draft tokens and emit correct target token
+            accepted_tokens.append(target_tokens[i])
+            print(f"   Token {i+1} ({draft_tokens[i]}): ❌ REJECTED -> Corrected to {target_tokens[i]}")
+            break
+            
+    speedup = len(accepted_tokens) / 1.0 # Generated N tokens in time of 1 target step!
+    print(f"\\n🎯 Emitted {len(accepted_tokens)} tokens in 1 target model step! Effective Speedup: {speedup:.2f}x")
+    return accepted_tokens
+
+simulate_speculative_decoding("def quicksort(arr):", draft_k=4)
+print("✅ Speculative Decoding accelerated generation with zero quality loss!")`,
+            executable: true,
+            explanation: [
+              "Autoregressive generation is memory-bandwidth bound: running a 70B model to generate 1 token takes ~15ms.",
+              "Speculative Decoding uses a small 1B draft model to speculate K tokens in 4ms.",
+              "The 70B target model verifies all K tokens in a single parallel forward pass, emitting multiple tokens per step.",
+              "Because the target model mathematically approves every token, the final text output is 100% identical to the target model.",
+            ],
+          },
+          detailedExplanation: [
+            "PagedAttention & Prefix Caching: PagedAttention partitions KV-caches into 16-token physical blocks. Multiple requests sharing common system prompts or documents reference the exact same physical memory pages (Prefix Caching), reducing prompt ingestion latency to near zero.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Deploying raw PyTorch / HuggingFace `generate()` in production web servers, locking the entire GPU on sequential token generation.",
+              badCode: "output = model.generate(input_ids) # Single request locks GPU, 0 continuous batching!",
+              goodCode: "// Deploy with vLLM / TensorRT-LLM / TGI with Continuous Batching enabled",
+              explanation: "HuggingFace `generate()` processes requests sequentially. Production engines (vLLM) use Continuous Batching to interleave hundreds of concurrent requests dynamically.",
+            },
+          ],
+          bestPractices: [
+            "Use vLLM (`vllm serve`) or TensorRT-LLM for high-concurrency production deployments.",
+            "Enable `--enable-prefix-caching` in vLLM for multi-turn conversational agents and RAG.",
+            "Deploy Speculative Decoding with aligned draft models for low-latency interactive generation.",
+          ],
+          summary: [
+            "PagedAttention manages KV-cache memory as virtual pages, eliminating memory fragmentation.",
+            "Continuous Batching interleaves concurrent requests dynamically at the token iteration level.",
+            "Speculative Decoding achieves 2x-3x faster token generation with zero accuracy loss.",
+          ],
+        },
+      ],
+    },
   ],
 };

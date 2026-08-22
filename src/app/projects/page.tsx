@@ -42,7 +42,7 @@ export default function ProjectsDirectoryPage() {
       "position": idx + 1,
       "name": p.title,
       "description": p.tagline,
-      "url": `https://academy.kwas.tech/projects/${p.slug}`,
+      "item": `https://academy.kwas.tech/projects/${p.slug}`,
     })),
   };
 

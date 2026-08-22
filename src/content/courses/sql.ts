@@ -417,5 +417,442 @@ export const sqlCourse: Course = {
         },
       ],
     },
+    {
+      id: "mod-sql-12",
+      slug: "postgres-wal-mvcc-vacuum-internals",
+      title: "Module 12: PostgreSQL Storage: WAL, MVCC & Vacuum Internals",
+      description: "Master PostgreSQL storage engine internals: Write-Ahead Logging (WAL), Multi-Version Concurrency Control (MVCC), and autovacuum tuning.",
+      lessons: [
+        {
+          id: "sql-wal-mvcc",
+          slug: "postgresql-wal-mvcc-vacuum-page-layout",
+          courseSlug: "sql",
+          moduleSlug: "postgres-wal-mvcc-vacuum-internals",
+          title: "PostgreSQL Storage Internals: WAL, MVCC & Vacuuming",
+          description: "Explore the physical storage engine of PostgreSQL: 8KB buffer page layout, Multi-Version Concurrency Control (xmin/xmax transaction visibility), Write-Ahead Logging (WAL) fsync checkpoints, and tuning autovacuum to eliminate table bloat.",
+          durationMinutes: 24,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "PostgreSQL 8KB Page Layout: PageHeaderData, ItemIdData (line pointers), and HeapTuples",
+            "Multi-Version Concurrency Control (MVCC): How `xmin` and `xmax` provide non-blocking reads during concurrent writes",
+            "Write-Ahead Logging (WAL): ARIES recovery algorithm and fsync durability guarantees",
+            "Autovacuum internals: Dead tuple reclamation, freezing transaction IDs, and preventing transaction wraparound panic",
+          ],
+          introduction: `PostgreSQL guarantees ACID compliance without locking readers through Multi-Version Concurrency Control (MVCC). When a row is updated, PostgreSQL does not overwrite the existing data in-place; it inserts a new version of the tuple with updated 'xmin' and 'xmax' transaction IDs. Write-Ahead Logging (WAL) records every binary disk modification sequentially to durable storage before dirty pages are flushed from the buffer pool to disk.`,
+          whyItMatters: `Dead tuples accumulate over time, inflating disk usage (table bloat) and slowing down sequential scans. Understanding autovacuum mechanics is essential for managing multi-terabyte production database clusters.`,
+          syntax: `SELECT ctid, xmin, xmax, * FROM users;\nVACUUM (VERBOSE, ANALYZE) users;`,
+          mainExample: {
+            title: "Inspecting MVCC Tuple Visibility and WAL Metadata",
+            language: "sql",
+            code: `-- 1. Create test table and insert a record
+CREATE TABLE account_balances (
+    account_id INT PRIMARY KEY,
+    balance NUMERIC(12, 2) NOT NULL
+);
+
+INSERT INTO account_balances VALUES (101, 5000.00);
+
+-- 2. Inspect physical MVCC system columns (ctid, xmin, xmax)
+-- ctid: Physical page location (0, 1) -> Page 0, Line pointer 1
+-- xmin: Transaction ID that inserted this tuple
+-- xmax: 0 (or transaction ID that deleted/updated this tuple)
+SELECT ctid, xmin, xmax, account_id, balance 
+FROM account_balances 
+WHERE account_id = 101;
+
+-- 3. Update the balance -> Creates a NEW tuple version on disk!
+UPDATE account_balances SET balance = 5500.00 WHERE account_id = 101;
+
+-- Inspect updated physical layout (ctid transitions to (0, 2)!)
+SELECT ctid, xmin, xmax, account_id, balance 
+FROM account_balances 
+WHERE account_id = 101;
+
+-- 4. Reclaim dead tuple (0, 1) and update query statistics
+VACUUM (ANALYZE) account_balances;`,
+            executable: true,
+            explanation: [
+              "ctid (0, 1) points to the physical 8KB page number and item offset of the row.",
+              "UPDATE inserts a new tuple with ctid (0, 2) and sets the old tuple's xmax to the active transaction ID.",
+              "Transactions starting before the update see tuple (0, 1); transactions starting after see tuple (0, 2) with zero locking.",
+              "VACUUM scans pages, marks dead unreferenced tuples as free space for future inserts, and updates table planner statistics.",
+            ],
+          },
+          detailedExplanation: [
+            "Transaction ID Wraparound: PostgreSQL transaction IDs are 32-bit integers (~4 billion transactions). Autovacuum runs 'Freeze' operations that mark old transaction IDs as frozen (`FrozenTransactionId = 2`), preventing database transaction ID wraparound shutdowns.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Disabling autovacuum on high-write tables to 'improve insert speed'.",
+              badCode: "ALTER TABLE transactions SET (autovacuum_enabled = false); -- Catastrophic bloat",
+              goodCode: "ALTER TABLE transactions SET (autovacuum_vacuum_scale_factor = 0.05);",
+              explanation: "Disabling autovacuum causes massive disk bloat, degrades index performance, and eventually causes database shutdowns due to transaction ID wraparound.",
+            },
+          ],
+          bestPractices: [
+            "Tune `autovacuum_vacuum_scale_factor` down to 0.05 on large high-write tables.",
+            "Monitor bloat using `pgstattuple` extensions.",
+            "Use SSD/NVMe drives with `wal_sync_method = fdatasync` for maximum Write-Ahead Log throughput.",
+          ],
+          summary: [
+            "MVCC provides lock-free concurrent reads by creating tuple versions tracked by `xmin` and `xmax`.",
+            "WAL ensures durability by writing sequential log records before flushing dirty heap pages.",
+            "Autovacuum reclaims dead tuple disk space and prevents transaction wraparound panics.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-sql-13",
+      slug: "advanced-indexing-btree-brin-gin-gist",
+      title: "Module 13: Advanced Indexing Architecture: B-Tree, BRIN, GIN & GiST",
+      description: "Master PostgreSQL index access methods: B-Tree internal nodes, BRIN block ranges, GIN inverted indexes, and GiST geometric trees.",
+      lessons: [
+        {
+          id: "sql-indexes-deep",
+          slug: "postgresql-indexes-btree-brin-gin-gist-hash",
+          courseSlug: "sql",
+          moduleSlug: "advanced-indexing-btree-brin-gin-gist",
+          title: "Database Indexing Internals: B-Tree, BRIN, GIN & GiST",
+          description: "Select the optimal database index architecture: B-Tree balanced search trees, Block Range Index (BRIN) for multi-billion row timeseries, Generalized Inverted Index (GIN) for JSONB/full-text, and GiST for spatial and range types.",
+          durationMinutes: 26,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "The internal mechanics of B-Tree indexes: Root, Internal branches, Leaf pages, and B-Tree Page Splits",
+            "How BRIN (Block Range Index) compresses index size from 50GB to 500KB on naturally ordered timeseries data",
+            "GIN (Generalized Inverted Index) posting lists for JSONB documents and full-text search",
+            "Covering indexes with `INCLUDE` clauses for zero-heap-lookup Index-Only Scans",
+          ],
+          introduction: `Indexes are specialized disk data structures that allow database engines to locate specific rows without reading entire multi-gigabyte tables from disk. PostgreSQL provides multiple specialized index access methods. Selecting the wrong index type can degrade write throughput and consume hundreds of gigabytes of unnecessary RAM.`,
+          whyItMatters: `For a 500-million row audit log table, a standard B-Tree index consumes ~15GB of RAM. A BRIN index achieves identical range query performance while consuming only 2MB of memory.`,
+          syntax: `CREATE INDEX idx_logs_brin ON logs USING BRIN (created_at);\nCREATE INDEX idx_users_json ON users USING GIN (metadata jsonb_path_ops);\nCREATE INDEX idx_orders_covering ON orders (user_id) INCLUDE (total_amount);`,
+          mainExample: {
+            title: "Creating High-Performance GIN, BRIN, and Covering Indexes",
+            language: "sql",
+            code: `-- 1. Covering B-Tree Index for Index-Only Scans (Heap Lookup Elimination)
+CREATE TABLE user_orders (
+    order_id BIGSERIAL PRIMARY KEY,
+    user_id INT NOT NULL,
+    total_amount NUMERIC(10, 2) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- INCLUDE clause stores total_amount in leaf pages without adding it to the B-Tree search key!
+CREATE INDEX idx_orders_covering ON user_orders (user_id) INCLUDE (total_amount);
+
+-- 2. GIN Index on JSONB Document Attributes
+CREATE TABLE user_profiles (
+    user_id INT PRIMARY KEY,
+    metadata JSONB NOT NULL
+);
+
+-- jsonb_path_ops creates hash tokens for instant key-value containment lookups (@>)
+CREATE INDEX idx_profiles_gin ON user_profiles USING GIN (metadata jsonb_path_ops);
+
+-- Query using GIN index:
+SELECT user_id FROM user_profiles WHERE metadata @> '{"role": "architect", "verified": true}';
+
+-- 3. BRIN Index for Multi-Million Row Ordered Telemetry Logs
+CREATE TABLE server_telemetry (
+    id BIGSERIAL,
+    server_id VARCHAR(50),
+    cpu_percent FLOAT,
+    logged_at TIMESTAMPTZ NOT NULL
+);
+
+-- BRIN records min/max timestamps per 128 disk pages (Tiny footprint!)
+CREATE INDEX idx_telemetry_brin ON server_telemetry USING BRIN (logged_at) WITH (pages_per_range = 128);`,
+            executable: true,
+            explanation: [
+              "Covering index (INCLUDE total_amount) allows PostgreSQL to execute an 'Index-Only Scan', reading total_amount directly from the index without touching the heap table pages.",
+              "GIN jsonb_path_ops creates an inverted index mapping hashed JSON key-value pairs to matching tuple IDs.",
+              "BRIN stores only the minimum and maximum values for physical 128-page ranges, keeping index memory footprint microscopic.",
+            ],
+          },
+          detailedExplanation: [
+            "B-Tree Page Splits: When inserting a key into a full 8KB B-Tree leaf page, PostgreSQL must split the page into two 4KB pages and update the parent branch node. Frequent page splits on random UUID primary keys cause index fragmentation. Sequential integer or ULID/UUIDv7 keys prevent page splits.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Using standard B-Tree indexes on massive time-series tables instead of BRIN.",
+              badCode: "CREATE INDEX idx_huge_btree ON events (timestamp); -- 30GB index consuming entire buffer pool",
+              goodCode: "CREATE INDEX idx_huge_brin ON events USING BRIN (timestamp); -- 5MB index",
+              explanation: "For append-only time-series data physically clustered by date, BRIN provides equivalent query speeds with 99% less memory usage.",
+            },
+          ],
+          bestPractices: [
+            "Use UUIDv7 (time-ordered) instead of UUIDv4 to eliminate B-Tree page splits.",
+            "Use `INCLUDE` clauses for covering indexes on hot queries to enable Index-Only Scans.",
+            "Use GIN `jsonb_path_ops` for JSONB containment lookups (`@>`).",
+          ],
+          summary: [
+            "B-Trees provide O(log N) lookup speed for point and range queries.",
+            "BRIN indexes naturally ordered datasets with negligible RAM overhead.",
+            "GIN indexes power fast JSONB attribute lookups and full-text search.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-sql-14",
+      slug: "query-optimizer-cost-models-joins",
+      title: "Module 14: Query Optimizer Internals: Cost Models & Join Strategies",
+      description: "Understand the Cost-Based Optimizer (CBO): Nested Loop vs Hash Join vs Merge Join, table statistics, and Genetic Query Optimization (GEQO).",
+      lessons: [
+        {
+          id: "sql-optimizer-internals",
+          slug: "database-query-optimizer-cost-model-join-strategies",
+          courseSlug: "sql",
+          moduleSlug: "query-optimizer-cost-models-joins",
+          title: "Query Optimizer Internals: Cost Models & Join Algorithms",
+          description: "Master the Cost-Based Optimizer (CBO): how PostgreSQL estimates disk I/O and CPU costs (`seq_page_cost`, `random_page_cost`), selecting between Nested Loop, Hash Join, and Merge Join algorithms, and tuning `pg_statistic` histogram buckets.",
+          durationMinutes: 24,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "The Cost-Based Optimizer formula: Total Cost = CPU Cost + Sequential I/O + Random I/O",
+            "The 3 Relational Join Algorithms: Nested Loop Join, Hash Join, and Merge Join",
+            "How `ANALYZE` builds MCV (Most Common Values) lists and histogram bounds in `pg_statistic`",
+            "Why Genetic Query Optimization (GEQO) activates on queries joining 12+ tables",
+          ],
+          introduction: `When you submit a SQL query, the database does not execute your SQL literally. The Cost-Based Optimizer (CBO) explores thousands of alternative execution trees and chooses the plan with the lowest estimated cost. Understanding how the optimizer calculates costs and picks join algorithms allows you to fix slow query plans with precision.`,
+          whyItMatters: `When table statistics become stale, the optimizer can miscalculate row estimates by 1,000,000x, picking a catastrophic Nested Loop join over a fast Hash Join and causing queries to take 10 minutes instead of 10 milliseconds.`,
+          syntax: `EXPLAIN (ANALYZE, BUFFERS, COSTS) SELECT ...;\nSET enable_nestloop = off;`,
+          mainExample: {
+            title: "Analyzing Optimizer Join Strategies with EXPLAIN BUFFERS",
+            language: "sql",
+            code: `-- 1. Execute Detailed Execution Plan with Memory Buffers
+EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT)
+SELECT 
+    c.name AS course_name,
+    COUNT(e.user_id) AS total_enrolled
+FROM courses c
+JOIN enrollments e ON c.id = e.course_id
+WHERE c.category = 'Systems Engineering'
+GROUP BY c.id, c.name;
+
+-- Sample Output Analysis:
+-- -> HashAggregate (Cost: 450.20..460.50 Rows: 150)
+--      Buffers: shared hit=42
+--      -> Hash Join (Cost: 120.00..420.00 Rows: 12000)
+--           Hash Cond: (e.course_id = c.id)
+--           -> Seq Scan on enrollments e (Cost: 0.00..250.00 Rows: 15000)
+--           -> Hash (Cost: 110.00..110.00 Rows: 800)
+--                -> Seq Scan on courses c (Filter: category = 'Systems Engineering')
+
+-- 2. Inspecting PostgreSQL Optimizer Statistics
+SELECT 
+    tablename, 
+    attname, 
+    n_distinct, 
+    correlation 
+FROM pg_stats 
+WHERE tablename = 'courses';`,
+            executable: true,
+            explanation: [
+              "Hash Join builds an in-memory hash table from the smaller dataset (courses) and probes it in O(1) time per enrollment row.",
+              "Buffers: shared hit=42 shows that 42 pages were read directly from the RAM buffer pool with zero disk I/O.",
+              "pg_stats correlation close to 1.0 indicates rows are physically stored on disk in the exact order of the column, enabling fast index scans.",
+            ],
+          },
+          detailedExplanation: [
+            "Join Strategy Decision Matrix: 1. Nested Loop Join is optimal when one table is tiny (<100 rows) and the inner table has an index lookup. 2. Hash Join is optimal for large unsorted datasets that fit in `work_mem`. 3. Merge Join is optimal when both inputs are already sorted by the join key.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Leaving `random_page_cost` at default 4.0 on modern NVMe SSD cloud storage.",
+              badCode: "SET random_page_cost = 4.0; -- Default for legacy magnetic spinning hard drives",
+              goodCode: "SET random_page_cost = 1.1; -- Accurate for NVMe SSD / EBS gp3 storage",
+              explanation: "A high random_page_cost discourages the optimizer from using indexes, causing it to incorrectly prefer slow full table sequential scans.",
+            },
+          ],
+          bestPractices: [
+            "Set `random_page_cost = 1.1` on SSD environments to encourage index usage.",
+            "Increase `work_mem` for analytical queries to allow Hash Joins to fit entirely in RAM.",
+            "Run `ANALYZE` after large batch insertions to update `pg_statistic` histogram buckets.",
+          ],
+          summary: [
+            "Cost-Based Optimizer models CPU and I/O costs to choose execution trees.",
+            "Nested Loop, Hash Join, and Merge Join each suit specific data distributions.",
+            "`EXPLAIN (ANALYZE, BUFFERS)` reveals exact memory cache hits and execution timings.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-sql-15",
+      slug: "distributed-transactions-2pc-replication",
+      title: "Module 15: Distributed Transactions: 2PC & Streaming Replication",
+      description: "Master distributed database consensus: Two-Phase Commit (`PREPARE TRANSACTION`), Synchronous Streaming Replication, and Quorum consensus.",
+      lessons: [
+        {
+          id: "sql-2pc-replication",
+          slug: "distributed-sql-two-phase-commit-streaming-replication",
+          courseSlug: "sql",
+          moduleSlug: "distributed-transactions-2pc-replication",
+          title: "Distributed SQL: Two-Phase Commit & Replication",
+          description: "Scale databases across nodes: atomic distributed transactions with Two-Phase Commit (2PC / `PREPARE TRANSACTION`), Physical vs Logical Streaming Replication, and synchronous commit quorum consistency.",
+          durationMinutes: 26,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "The anatomy of Two-Phase Commit (2PC): Prepare Phase (Voting) vs Commit Phase (Resolution)",
+            "Executing distributed transactions with `PREPARE TRANSACTION 'tx_id'` and `COMMIT PREPARED`",
+            "Physical Streaming Replication vs Logical Replication (Decoded Write-Ahead Logs)",
+            "Configuring zero-data-loss synchronous replication with `synchronous_commit = remote_apply`",
+          ],
+          introduction: `When an enterprise application splits data across multiple database instances or microservices (e.g. User Database and Billing Database), standard single-node transactions cannot guarantee atomicity. Two-Phase Commit (2PC) is a distributed consensus algorithm that coordinates multiple independent database nodes to either commit or abort a transaction together as an atomic unit.`,
+          whyItMatters: `Financial settlement systems cannot allow money to be deducted from Database A without guaranteed recording in Database B. 2PC and synchronous streaming replication prevent distributed data divergence.`,
+          syntax: `BEGIN;\nUPDATE accounts SET bal = bal - 100 WHERE id = 1;\nPREPARE TRANSACTION 'global_tx_99';\nCOMMIT PREPARED 'global_tx_99';`,
+          mainExample: {
+            title: "Executing a Two-Phase Commit (2PC) Transaction Across Nodes",
+            language: "sql",
+            code: `-- Node 1 (Ledger Service Database): Phase 1 - Prepare
+BEGIN;
+UPDATE customer_wallets SET balance = balance - 500.00 WHERE customer_id = 99;
+-- Prepare the transaction for global consensus (Flushes state to WAL and releases connection lock)
+PREPARE TRANSACTION 'transfer_tx_global_001';
+
+-- Node 2 (Payment Gateway Database): Phase 1 - Prepare
+BEGIN;
+INSERT INTO processed_transfers (customer_id, amount, status) VALUES (99, 500.00, 'SETTLED');
+PREPARE TRANSACTION 'transfer_tx_global_001';
+
+-- ==========================================================
+-- Distributed Coordinator receives 'PREPARED' vote from BOTH nodes:
+-- ==========================================================
+
+-- Node 1: Phase 2 - Commit
+COMMIT PREPARED 'transfer_tx_global_001';
+
+-- Node 2: Phase 2 - Commit
+COMMIT PREPARED 'transfer_tx_global_001';
+
+-- 3. Monitoring Replication Health and Lag
+SELECT 
+    client_addr, 
+    state, 
+    sync_state, 
+    sync_priority,
+    pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn) AS replication_lag_bytes
+FROM pg_stat_replication;`,
+            executable: true,
+            explanation: [
+              "PREPARE TRANSACTION writes all modified rows to persistent WAL storage and guarantees the transaction CAN be committed even if the database crashes.",
+              "If either node fails during the Prepare phase, the coordinator issues 'ROLLBACK PREPARED' to both nodes, ensuring zero partial state.",
+              "pg_stat_replication monitors streaming replication lag bytes between primary and standby replicas in real time.",
+            ],
+          },
+          detailedExplanation: [
+            "Replication Modes: In Asynchronous Replication (`synchronous_commit = off/local`), commits return instantly, but failover may lose milliseconds of data. In Synchronous Replication (`synchronous_commit = on`), commits wait until the standby confirms writing the WAL to disk.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Abandoning prepared transactions without committing or rolling them back, causing permanent lock retention.",
+              badCode: "PREPARE TRANSACTION 'tx_1'; -- Coordinator crashes and never commits",
+              goodCode: "SELECT * FROM pg_prepared_xacts; -- Monitor and resolve dangling prepared transactions",
+              explanation: "Prepared transactions hold table locks and prevent VACUUM from cleaning dead tuples until explicitly resolved with COMMIT/ROLLBACK PREPARED.",
+            },
+          ],
+          bestPractices: [
+            "Implement automated monitors on `pg_prepared_xacts` to detect orphaned distributed transactions.",
+            "Use `synchronous_standby_names = 'ANY 2 (standby1, standby2, standby3)'` for quorum replication.",
+            "Use Logical Replication for zero-downtime major PostgreSQL version upgrades.",
+          ],
+          summary: [
+            "Two-Phase Commit guarantees atomicity across multiple independent database clusters.",
+            "Prepare Phase ensures durability in WAL; Commit Phase finalizes the transaction.",
+            "Streaming replication distributes read traffic and provides high-availability failover.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "mod-sql-16",
+      slug: "postgis-timescaledb-spatial-timeseries",
+      title: "Module 16: TimescaleDB Hypertables & PostGIS Spatial Analytics",
+      description: "Master modern SQL extensions: time-series hypertables with automatic chunking in TimescaleDB and geospatial indexing in PostGIS.",
+      lessons: [
+        {
+          id: "sql-postgis-timeseries",
+          slug: "postgresql-postgis-spatial-timescaledb-hypertables",
+          courseSlug: "sql",
+          moduleSlug: "postgis-timescaledb-spatial-timeseries",
+          title: "PostGIS Geospatial Analytics & TimescaleDB Hypertables",
+          description: "Extend PostgreSQL beyond standard relational tables: high-performance time-series data management with TimescaleDB Hypertables (automated range chunking) and geospatial GIS queries with PostGIS (`ST_DWithin`, `ST_Distance`, GiST R-Tree indexing).",
+          durationMinutes: 26,
+          difficulty: "Advanced",
+          whatYouWillLearn: [
+            "How TimescaleDB Hypertables partition data into physical time/space chunks automatically",
+            "Continuous Aggregates and automatic data retention policies in TimescaleDB",
+            "Geospatial primitives in PostGIS: `GEOMETRY` (flat Cartesian) vs `GEOGRAPHY` (ellipsoidal Earth)",
+            "Executing spatial proximity queries (`ST_DWithin`) with GiST spatial indexes",
+          ],
+          introduction: `PostgreSQL's extension architecture allows it to function as both a specialized Time-Series database and a Geographic Information System (GIS). TimescaleDB transforms standard tables into 'Hypertables' that automatically partition incoming data into physical time chunks. PostGIS adds spatial data types (Points, Polygons) and spatial algorithms (R-Tree GiST indexes) capable of querying millions of geographic coordinates in milliseconds.`,
+          whyItMatters: `Ride-sharing platforms (like Uber/Lyft), IoT sensor fleets, and logistics apps use PostGIS and TimescaleDB to track millions of moving vehicles and sensor telemetry data points without separate NoSQL databases.`,
+          syntax: `SELECT create_hypertable('metrics', 'time');\nSELECT * FROM venues WHERE ST_DWithin(geom, ST_MakePoint(lon, lat)::geography, 5000);`,
+          mainExample: {
+            title: "Building a Geospatial Proximity Search with PostGIS and GiST",
+            language: "sql",
+            code: `-- 1. Enable PostGIS Extension
+CREATE EXTENSION IF NOT EXISTS postgis;
+
+-- 2. Create Spatial Table for EV Charging Stations
+CREATE TABLE charging_stations (
+    station_id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    -- GEOGRAPHY type handles Earth curvature (WGS 84 / SRID 4326) in meters!
+    location GEOGRAPHY(POINT, 4326) NOT NULL
+);
+
+-- 3. Create Spatial GiST (R-Tree) Index
+CREATE INDEX idx_stations_spatial ON charging_stations USING GIST (location);
+
+-- Insert Sample Coordinates (Longitude, Latitude)
+INSERT INTO charging_stations (name, location) VALUES
+('Downtown Supercharger', ST_SetSRID(ST_MakePoint(-73.9851, 40.7484), 4326)),
+('Airport Fast Charger', ST_SetSRID(ST_MakePoint(-73.7781, 40.6413), 4326));
+
+-- 4. Spatial Proximity Query: Find all charging stations within 5000 meters (5km) of user
+SELECT 
+    name,
+    ROUND(ST_Distance(location, ST_SetSRID(ST_MakePoint(-73.9850, 40.7480), 4326)::geography)::numeric, 2) AS distance_meters
+FROM charging_stations
+WHERE ST_DWithin(
+    location,
+    ST_SetSRID(ST_MakePoint(-73.9850, 40.7480), 4326)::geography,
+    5000 -- 5,000 meters search radius
+)
+ORDER BY distance_meters ASC;`,
+            executable: true,
+            explanation: [
+              "GEOGRAPHY(POINT, 4326) represents GPS coordinates on the Earth's ellipsoidal surface.",
+              "USING GIST builds an R-Tree index bounding boxes around points, enabling lightning-fast spatial lookups.",
+              "ST_DWithin filters stations within 5,000 meters using index bounding box checks before calculating exact distances.",
+              "ST_Distance calculates the precise geodetic distance in meters.",
+            ],
+          },
+          detailedExplanation: [
+            "TimescaleDB Hypertable Architecture: Under the hood, a Hypertable is an abstraction over dozens of individual PostgreSQL tables (chunks). When you query `WHERE time > NOW() - INTERVAL '1 hour'`, TimescaleDB prunes 99% of chunks at planning time, reading only the newest 1-hour chunk from memory.",
+          ],
+          commonMistakes: [
+            {
+              mistake: "Passing coordinates in (Latitude, Longitude) order to ST_MakePoint instead of standard (Longitude, Latitude / X, Y).",
+              badCode: "ST_MakePoint(40.7128, -74.0060) -- Incorrect: Latitude first",
+              goodCode: "ST_MakePoint(-74.0060, 40.7128) -- Correct: Longitude (X) then Latitude (Y)",
+              explanation: "In GIS systems, coordinates always follow X (Longitude) and Y (Latitude). Inverting them places points in Antarctica or the ocean.",
+            },
+          ],
+          bestPractices: [
+            "Always build GiST indexes on `GEOGRAPHY` / `GEOMETRY` columns.",
+            "Use `GEOGRAPHY` when calculating distances in meters across Earth coordinates.",
+            "Use TimescaleDB Continuous Aggregates for automatic real-time metric downsampling (e.g. 1-minute to 1-hour rollups).",
+          ],
+          summary: [
+            "PostGIS adds geospatial coordinates, polygon mathematics, and spatial GiST indexing.",
+            "TimescaleDB Hypertables partition time-series metrics into manageable physical chunks.",
+            "Enables PostgreSQL to replace specialized geospatial and time-series NoSQL engines.",
+          ],
+        },
+      ],
+    },
   ],
 };
